@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 57.1 (83088) - https://sketch.com -->
+    <title>Artboard</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <polygon id="path-1" points="0 0 20 0 20 14 0 14"></polygon>
+    </defs>
+    <g id="Artboard" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-3" transform="translate(2.000000, 5.000000)">
+            <mask id="mask-2" fill="white">
+                <use xlink:href="#path-1"></use>
+            </mask>
+            <g id="Clip-2"></g>
+            <path d="M8,10.0000235 L8,3.99997648 L13.1958678,7.00016463 L8,10.0000235 Z M19.582006,2.18626529 C19.3520188,1.32575259 18.6742396,0.647977422 17.8138865,0.417991533 C16.2541878,0 9.99991769,0 9.99991769,0 C9.99991769,0 3.74581224,0 2.18611351,0.417991533 C1.32559575,0.647977422 0.647981232,1.32575259 0.417829362,2.18626529 C0,3.74579022 0,7 0,7 C0,7 0,10.2542098 0.417829362,11.8138993 C0.647981232,12.674412 1.32559575,13.3520226 2.18611351,13.5820085 C3.74581224,14 9.99991769,14 9.99991769,14 C9.99991769,14 16.2541878,14 17.8138865,13.5820085 C18.6742396,13.3520226 19.3520188,12.674412 19.582006,11.8138993 C20,10.2542098 20,7 20,7 C20,7 20,3.74579022 19.582006,2.18626529 L19.582006,2.18626529 Z" id="Fill-1" fill="#FFFFFF" mask="url(#mask-2)"></path>
+        </g>
+    </g>
+</svg>
