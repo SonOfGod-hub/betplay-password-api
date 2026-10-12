@@ -1,0 +1,1579 @@
+(function(w, d) {
+  'use strict';
+
+  // ── 1. Container / Account Guard & Multi-Instance Support ──────
+  var _ct_aid = "667f0fb3b836e386827a1572";
+  w.__CT_CONTAINERS__ = w.__CT_CONTAINERS__ || {};
+  if (_ct_aid && w.__CT_CONTAINERS__[_ct_aid]) {
+    return;
+  }
+  if (_ct_aid) {
+    w.__CT_CONTAINERS__[_ct_aid] = true;
+  }
+  w.__CT_ANALYTICS_INITIALIZED__ = true;
+
+  var _ct_sdk_version = '2.6.0';
+  var _ct_api = 'https://ctag.containermedia.net/api';
+  var _ct_iapi = 'https://adstudio.containermedia.net/api';
+  var _ct_fetch = (typeof w.fetch === 'function') ? w.fetch.bind(w) : null;
+  var _ct_debug = !!(w.__CT_DEBUG__ || (w.location && (w.location.search || '').indexOf('ct_debug=1') !== -1));
+
+  // ── 2. Observability & Telemetry Metrics ────────────────────────
+  var _ct_metrics = {
+    events_created: 0,
+    events_queued: 0,
+    events_sent: 0,
+    events_deduplicated: 0,
+    events_dropped: 0,
+    events_persisted: 0,
+    events_recovered: 0,
+    batches_sent: 0,
+    batches_failed: 0,
+    batches_retried: 0,
+    queue_size: 0,
+    critical_store_size: 0
+  };
+  w.__CT_METRICS__ = _ct_metrics;
+
+  function _ct_log() {
+    if (_ct_debug && w.console && typeof w.console.log === 'function') {
+      var args = ['[CTAG v' + _ct_sdk_version + ']'];
+      for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      w.console.log.apply(w.console, args);
+    }
+  }
+
+  // ── 3. Storage Layer (Memory fallback + throttled activity) ────
+  var _ct_mem = {};
+  var _ct_storage = {
+    get: function(k, ss) {
+      try {
+        var s = ss ? w.sessionStorage : w.localStorage;
+        return s ? s.getItem(k) : _ct_mem[k];
+      } catch (e) {
+        return _ct_mem[k] || null;
+      }
+    },
+    set: function(k, v, ss) {
+      try {
+        var s = ss ? w.sessionStorage : w.localStorage;
+        if (s) s.setItem(k, v);
+      } catch (e) {}
+      _ct_mem[k] = v;
+    },
+    remove: function(k, ss) {
+      try {
+        var s = ss ? w.sessionStorage : w.localStorage;
+        if (s) s.removeItem(k);
+      } catch (e) {}
+      delete _ct_mem[k];
+    }
+  };
+
+  var _ct_lastActWritten = 0;
+  function _ct_updateActivity(ts) {
+    var now = ts || Date.now();
+    _ct_mem['CT_LAST_ACT'] = String(now);
+    if (now - _ct_lastActWritten > 30000) {
+      _ct_lastActWritten = now;
+      _ct_storage.set('CT_LAST_ACT', String(now));
+    }
+  }
+
+  // ── 4. UUID & Safe Serialization ──────────────────────────────
+  function _ct_uuid() {
+    try {
+      if (w.crypto && typeof w.crypto.randomUUID === 'function') return w.crypto.randomUUID();
+      return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function(c) {
+        var r = w.crypto.getRandomValues(new Uint8Array(1))[0];
+        return (c ^ (r & (15 >> (c / 4)))).toString(16);
+      });
+    } catch (e) {}
+    return 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9) + '-' + Math.random().toString(36).substring(2, 9);
+  }
+
+  function _ct_safeStringify(obj) {
+    try {
+      return JSON.stringify(obj);
+    } catch (e) {
+      try {
+        var seen = [];
+        return JSON.stringify(obj, function(k, v) {
+          if (typeof v === 'object' && v !== null) {
+            if (seen.indexOf(v) !== -1) return undefined;
+            seen.push(v);
+          }
+          return v;
+        });
+      } catch (e2) {
+        return '{}';
+      }
+    }
+  }
+
+  // ── 5. Query Parameters & URL Sanitizer ────────────────────────
+  var _ct_allowedQueryParams = {
+    'utm_source':1,'utm_medium':1,'utm_campaign':1,'utm_term':1,'utm_content':1,'utm_id':1,
+    'ctgid':1,'gclid':1,'dclid':1,'wbraid':1,'gbraid':1,'fbclid':1,'_fbc':1,'msclkid':1,
+    'ttclid':1,'twclid':1,'li_fat_id':1,'sccid':1,'epik':1,'rdt_cid':1,'ttd_clkid':1,
+    'tdid':1,'xandr_uid':1,'anj_uid':1,'sa_cid':1,'prp_click_id':1,'gum':1,'adtk':1,
+    'is_click_id':1,'btag':1,'afid':1,'aff_click_id':1
+  };
+
+  function _ct_sanitizeUrl(rawUrl) {
+    if (!rawUrl) return '';
+    try {
+      var parts = rawUrl.split('#')[0].split('?');
+      var base = parts[0];
+      var qs = parts[1];
+      if (!qs) return base;
+      var pairs = qs.split('&');
+      var clean = [];
+      for (var i = 0; i < pairs.length; i++) {
+        if (!pairs[i]) continue;
+        var eq = pairs[i].indexOf('=');
+        var k = eq !== -1 ? pairs[i].substring(0, eq) : pairs[i];
+        var v = eq !== -1 ? pairs[i].substring(eq + 1) : '';
+        var decK = '';
+        try { decK = decodeURIComponent(k).toLowerCase(); } catch (e) { decK = k.toLowerCase(); }
+        if (_ct_allowedQueryParams[decK]) {
+          clean.push(k + '=' + v);
+        }
+      }
+      return clean.length > 0 ? base + '?' + clean.join('&') : base;
+    } catch (e) {
+      return (rawUrl || '').split('#')[0].split('?')[0];
+    }
+  }
+
+  function normalizeNavigationUrl(rawUrl, preserveHash) {
+    if (!rawUrl) return '';
+    try {
+      var urlObj = new URL(rawUrl, w.location ? w.location.href : 'http://localhost');
+      var path = urlObj.pathname || '/';
+      if (preserveHash && urlObj.hash) {
+        path += urlObj.hash;
+      }
+      return path;
+    } catch (e) {
+      return (rawUrl || '').split('?')[0];
+    }
+  }
+
+  // ── 6. Identity Separation: anonymous_id vs user_id ────────────
+  var _ct_layer = w.containerLayer = w.containerLayer || [];
+  if (!_ct_layer[0]) _ct_layer.push({});
+  _ct_layer[0].events = _ct_layer[0].events || [];
+
+  // anonymous_id is permanent and immutable for CTAG
+  var _ct_anon_id = _ct_storage.get('CT_ANON_ID') || _ct_storage.get('CTUUID');
+  if (!_ct_anon_id) {
+    _ct_anon_id = _ct_uuid();
+    _ct_storage.set('CT_ANON_ID', _ct_anon_id);
+    _ct_storage.set('CTUUID', _ct_anon_id); // legacy fallback
+  }
+
+  // user_id is separate, nullable, and set upon resolution
+  var _ct_user_id = _ct_storage.get('CT_USER_ID') || null;
+  _ct_layer[0].userid = _ct_user_id || _ct_anon_id;
+
+  var _ct_account = _ct_aid || _ct_storage.get('CTID') || '';
+  if (_ct_account) _ct_storage.set('CTID', _ct_account);
+
+  var _ct_now = Date.now();
+  var _ct_sid = _ct_storage.get('CTSID', true);
+  var _ct_lastAct = parseInt(_ct_storage.get('CT_LAST_ACT') || '0', 10);
+  var _ct_snum = parseInt(_ct_storage.get('CT_SNUM') || '1', 10);
+
+  if (!_ct_sid || (_ct_now - _ct_lastAct > 1800000)) {
+    _ct_sid = _ct_uuid();
+    _ct_storage.set('CTSID', _ct_sid, true);
+    if (_ct_lastAct > 0) {
+      _ct_snum++;
+      _ct_storage.set('CT_SNUM', _ct_snum.toString());
+    }
+  }
+  _ct_updateActivity(_ct_now);
+
+  // ── 7. Query Parameters & Click IDs Extraction ─────────────────
+  function _ct_extractParams(searchStr) {
+    var qp = {};
+    var s = searchStr || '';
+    if (s) {
+      var pairs = s.replace(/^[?#&]/, '').split('&');
+      for (var i = 0; i < pairs.length; i++) {
+        if (!pairs[i]) continue;
+        var eq = pairs[i].indexOf('=');
+        var rk = eq !== -1 ? pairs[i].substring(0, eq) : pairs[i];
+        var rv = eq !== -1 ? pairs[i].substring(eq + 1) : '';
+        var k = '', v = '';
+        try { k = decodeURIComponent(rk); } catch (e) { k = rk; }
+        try { v = decodeURIComponent(rv.split('+').join(' ')); } catch (e) { v = rv; }
+        if (k) qp[k] = v;
+      }
+    }
+    return qp;
+  }
+
+  var _ct_loc = w.location || { href: '', pathname: '', search: '', hostname: '' };
+  var _ct_qp = _ct_extractParams(_ct_loc.search);
+
+  var _ct_incomingGid = _ct_qp['ctgid'] || '';
+  var _ct_gid = _ct_incomingGid || _ct_storage.get('CTGID') || '';
+  if (_ct_incomingGid) _ct_storage.set('CTGID', _ct_incomingGid);
+
+  function _ct_buildUtm(qp) {
+    return {
+      source:   qp['utm_source']   || '',
+      medium:   qp['utm_medium']   || '',
+      campaign: qp['utm_campaign'] || '',
+      term:     qp['utm_term']     || '',
+      content:  qp['utm_content']  || '',
+      id:       qp['utm_id']       || ''
+    };
+  }
+  var _ct_utm = _ct_buildUtm(_ct_qp);
+
+  function _ct_buildClicks(qp, incomingGid) {
+    return {
+      gclid:        qp['gclid']        || '',
+      dclid:        qp['dclid']        || '',
+      wbraid:       qp['wbraid']       || '',
+      gbraid:       qp['gbraid']       || '',
+      fbclid:       qp['fbclid']       || '',
+      _fbc:         qp['_fbc']         || '',
+      msclkid:      qp['msclkid']      || '',
+      ttclid:       qp['ttclid']       || '',
+      twclid:       qp['twclid']       || '',
+      li_fat_id:    qp['li_fat_id']    || '',
+      ScCid:        qp['ScCid']        || '',
+      epik:         qp['epik']         || '',
+      rdt_cid:      qp['rdt_cid']      || '',
+      ttd_clkid:    qp['ttd_clkid']    || '',
+      tdid:         qp['tdid']         || '',
+      xandr_uid:    qp['xandr_uid']    || '',
+      anj_uid:      qp['anj_uid']      || '',
+      sa_cid:       qp['sa_cid']       || '',
+      prp_click_id: qp['prp_click_id'] || '',
+      gum:          qp['gum']          || '',
+      adtk:         qp['adtk']         || '',
+      is_click_id:  qp['is_click_id']  || '',
+      btag:         qp['btag']         || '',
+      afid:         qp['afid']         || '',
+      aff_click_id: qp['aff_click_id'] || '',
+      ctgid:        incomingGid        || ''
+    };
+  }
+  var _ct_clicks = _ct_buildClicks(_ct_qp, _ct_incomingGid);
+
+  var _ct_ref = d.referrer || '';
+  var _ct_refHost = '';
+  if (_ct_ref) {
+    try {
+      _ct_refHost = (new URL(_ct_ref)).hostname;
+    } catch (e) {
+      _ct_refHost = _ct_ref.split('/')[2] || '';
+    }
+  }
+  var _ct_isExtRef = !!(_ct_refHost && _ct_refHost !== _ct_loc.hostname);
+
+  // ── 8. Multi-Touch Channel Detection ───────────────────────────
+  function _ct_detectChannel(utm, clicks, refHost, isExt) {
+    var s = (utm.source || '').toLowerCase();
+    var m = (utm.medium || '').toLowerCase();
+
+    var isSocialSource = /facebook|instagram|twitter|t.co|linkedin|tiktok|pinterest|reddit|snapchat|youtube/i.test(s) ||
+                         /facebook|instagram|twitter|t.co|linkedin|tiktok|pinterest|reddit|snapchat|youtube/i.test(refHost);
+
+    if (clicks.gclid || clicks.wbraid || clicks.gbraid || clicks.msclkid) return 'Paid Search';
+    if (clicks.fbclid || clicks._fbc || clicks.ttclid || clicks.twclid || clicks.li_fat_id || clicks.ScCid || clicks.epik || clicks.rdt_cid) return 'Paid Social';
+    if (clicks.dclid || clicks.ttd_clkid || clicks.tdid || clicks.xandr_uid || clicks.anj_uid || clicks.sa_cid || clicks.prp_click_id || clicks.gum || clicks.adtk || clicks.is_click_id) return 'Programmatic';
+    if (clicks.btag || clicks.afid || clicks.aff_click_id) return 'Affiliate';
+
+    if (m === 'paidsocial' || m === 'paid_social' || m === 'social-paid' || m === 'social_paid') return 'Paid Social';
+    if (m === 'cpc' || m === 'ppc' || m === 'paidsearch' || m === 'paid-search') {
+      return isSocialSource ? 'Paid Social' : 'Paid Search';
+    }
+    if (m === 'display' || m === 'programmatic' || m === 'banner' || m === 'native' || m === 'cpm') return 'Programmatic';
+    if (m === 'email' || m === 'newsletter') return 'Email';
+    if (m === 'affiliate' || m === 'cpa' || m === 'cpl' || m === 'aff') return 'Affiliate';
+
+    if (refHost) {
+      if (/google|bing|yahoo|duckduckgo|ecosia|baidu|yandex/i.test(refHost)) return 'Organic Search';
+      if (isSocialSource) return 'Organic Social';
+      if (/stackadapt|propellerads|xandr|appnexus|thetradedesk|adsrvr|criteo|amazon-adsystem|advertising.amazon|doubleclick|googlesyndication/i.test(refHost)) return 'Programmatic';
+      if (isExt) return 'Referral';
+    }
+    if (utm.source) return 'Campaign (' + utm.source + ')';
+    return 'Direct';
+  }
+
+  var _ct_channel = _ct_detectChannel(_ct_utm, _ct_clicks, _ct_refHost, _ct_isExtRef);
+
+  function _ct_buildTouch(utm, clicks, channel, ref, loc, refHost, isExt) {
+    return {
+      ts: new Date().toISOString(),
+      source: utm.source || (isExt ? refHost : 'direct'),
+      medium: utm.medium || (clicks.gclid || clicks.fbclid || clicks.msclkid ? 'cpc' : (isExt ? 'referral' : 'none')),
+      campaign: utm.campaign || '',
+      term: utm.term || '',
+      content: utm.content || '',
+      utm_id: utm.id || '',
+      channel: channel,
+      referrer: _ct_sanitizeUrl(ref),
+      landing: _ct_sanitizeUrl(loc.href),
+      gclid: clicks.gclid,
+      dclid: clicks.dclid,
+      wbraid: clicks.wbraid,
+      gbraid: clicks.gbraid,
+      fbclid: clicks.fbclid,
+      _fbc: clicks._fbc,
+      msclkid: clicks.msclkid,
+      ttclid: clicks.ttclid,
+      twclid: clicks.twclid,
+      li_fat_id: clicks.li_fat_id,
+      ScCid: clicks.ScCid,
+      epik: clicks.epik,
+      rdt_cid: clicks.rdt_cid,
+      ttd_clkid: clicks.ttd_clkid,
+      tdid: clicks.tdid,
+      xandr_uid: clicks.xandr_uid,
+      anj_uid: clicks.anj_uid,
+      sa_cid: clicks.sa_cid,
+      prp_click_id: clicks.prp_click_id,
+      gum: clicks.gum,
+      adtk: clicks.adtk,
+      is_click_id: clicks.is_click_id,
+      btag: clicks.btag,
+      afid: clicks.afid,
+      aff_click_id: clicks.aff_click_id,
+      ctgid: clicks.ctgid
+    };
+  }
+
+  var _ct_currentTouch = _ct_buildTouch(_ct_utm, _ct_clicks, _ct_channel, _ct_ref, _ct_loc, _ct_refHost, _ct_isExtRef);
+
+  // ── 9. AttributionManager & Numeric attribution_version ───────
+  var _ct_attrVer = parseInt(_ct_storage.get('CT_ATTR_VERSION') || '1', 10);
+  if (isNaN(_ct_attrVer) || _ct_attrVer < 1) _ct_attrVer = 1;
+
+  var _ct_firstTouch = null;
+  try {
+    var _ct_rawFT = _ct_storage.get('CT_FT');
+    if (_ct_rawFT) _ct_firstTouch = JSON.parse(_ct_rawFT);
+  } catch (e) {}
+  if (!_ct_firstTouch) {
+    _ct_firstTouch = Object.assign({}, _ct_currentTouch);
+    try { _ct_storage.set('CT_FT', _ct_safeStringify(_ct_firstTouch)); } catch (e) {}
+  }
+
+  var _ct_lastTouch = null;
+  try {
+    var _ct_rawLT = _ct_storage.get('CT_LT');
+    if (_ct_rawLT) _ct_lastTouch = JSON.parse(_ct_rawLT);
+  } catch (e) {}
+
+  var _ct_touches = [];
+  try {
+    var _ct_rawTouches = _ct_storage.get('CT_TOUCHES');
+    if (_ct_rawTouches) _ct_touches = JSON.parse(_ct_rawTouches);
+    if (!Array.isArray(_ct_touches)) _ct_touches = [];
+  } catch (e) {}
+
+  function _ct_hasAttributableCampaign(utm, clicks, incomingGid, isExt) {
+    return !!(
+      utm.source || utm.medium || utm.campaign || utm.term || utm.content || utm.id ||
+      clicks.gclid || clicks.fbclid || clicks.msclkid || clicks.ttclid || clicks.sa_cid ||
+      clicks.btag || clicks.afid || incomingGid || isExt
+    );
+  }
+
+  var _ct_hasCampaign = _ct_hasAttributableCampaign(_ct_utm, _ct_clicks, _ct_incomingGid, _ct_isExtRef);
+
+  if (!_ct_lastTouch || _ct_hasCampaign) {
+    _ct_lastTouch = Object.assign({}, _ct_currentTouch);
+    try { _ct_storage.set('CT_LT', _ct_safeStringify(_ct_lastTouch)); } catch (e) {}
+  }
+
+  if (_ct_hasCampaign || _ct_touches.length === 0) {
+    _ct_touches.push({
+      ts: _ct_currentTouch.ts,
+      channel: _ct_channel,
+      source: _ct_currentTouch.source,
+      medium: _ct_currentTouch.medium,
+      campaign: _ct_currentTouch.campaign,
+      gclid: _ct_currentTouch.gclid,
+      fbclid: _ct_currentTouch.fbclid,
+      msclkid: _ct_currentTouch.msclkid,
+      sa_cid: _ct_currentTouch.sa_cid
+    });
+    if (_ct_touches.length > 15) _ct_touches.shift();
+    try { _ct_storage.set('CT_TOUCHES', _ct_safeStringify(_ct_touches)); } catch (e) {}
+  }
+
+  function _ct_getAttributionSnapshot() {
+    return {
+      attribution_version: _ct_attrVer,
+      first_touch: _ct_firstTouch,
+      last_touch: _ct_lastTouch,
+      current_touch: _ct_currentTouch,
+      touches: _ct_touches
+    };
+  }
+
+  // ── 10. Device & Environment Detection ──────────────────────────
+  function _ct_detectDevice() {
+    var ua = (w.navigator && w.navigator.userAgent) ? w.navigator.userAgent.toLowerCase() : '';
+    if (ua.indexOf('tablet') !== -1 || ua.indexOf('ipad') !== -1 || ua.indexOf('playbook') !== -1) return 'tablet';
+    if (ua.indexOf('mobile') !== -1 || ua.indexOf('iphone') !== -1 || ua.indexOf('android') !== -1) return 'mobile';
+    return 'desktop';
+  }
+
+  var _ct_device = _ct_detectDevice();
+  var _ct_screen = (w.screen ? w.screen.width + 'x' + w.screen.height : '');
+  var _ct_viewport = (w.innerWidth ? w.innerWidth + 'x' + w.innerHeight : '');
+  var _ct_lang = (w.navigator && (w.navigator.language || w.navigator.userLanguage)) || '';
+  var _ct_tz = '';
+  try { _ct_tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+
+  var _ct_pageViewId = _ct_uuid();
+  var _ct_pageStartedAt = Date.now();
+
+  // ── 11. CTGID Multi-Key Cache & Non-blocking Identity Resolution 
+  var _ct_gidCache = {};
+  try {
+    var rawGidCache = _ct_storage.get('CT_GID_CACHE');
+    if (rawGidCache) _ct_gidCache = JSON.parse(rawGidCache) || {};
+  } catch (e) {}
+
+  function _ct_saveGidCache() {
+    try {
+      var keys = Object.keys(_ct_gidCache);
+      if (keys.length > 30) {
+        delete _ct_gidCache[keys[0]];
+      }
+      _ct_storage.set('CT_GID_CACHE', _ct_safeStringify(_ct_gidCache));
+    } catch (e) {}
+  }
+
+  function _ct_resolveUserAsync() {
+    if (!_ct_gid) return;
+
+    var cached = _ct_gidCache[_ct_gid] || (_ct_gidCache.ctgid === _ct_gid ? _ct_gidCache : null);
+    if (cached && (Date.now() - cached.resolved_at < 86400000)) {
+      if (cached.userid) {
+        _ct_user_id = cached.userid;
+        _ct_storage.set('CT_USER_ID', _ct_user_id);
+        if (_ct_layer && _ct_layer[0]) _ct_layer[0].userid = _ct_user_id;
+        _ct_log('CTGID resolved from multi-key cache:', _ct_user_id);
+      }
+      return;
+    }
+
+    var impUrl = _ct_iapi + '/creative/impression?ctgid=' + encodeURIComponent(_ct_gid);
+    if (_ct_fetch) {
+      _ct_fetch(impUrl, { method: 'GET', cache: 'no-store', credentials: 'omit' })
+        .then(function(res) {
+          if (!res || !res.ok) throw new Error('');
+          return res.json();
+        })
+        .then(function(json) {
+          if (json && json.userid) {
+            _ct_user_id = String(json.userid);
+            _ct_storage.set('CT_USER_ID', _ct_user_id);
+            if (_ct_layer && _ct_layer[0]) _ct_layer[0].userid = _ct_user_id;
+            _ct_gidCache[_ct_gid] = {
+              userid: _ct_user_id,
+              resolved_at: Date.now()
+            };
+            _ct_saveGidCache();
+            _ct_log('CTGID resolved userid:', _ct_user_id);
+
+            // Emit identity_link event so backend unifies anonymous_id and user_id
+            if (typeof w.sendEventTracking === 'function') {
+              w.sendEventTracking('identity_link', {
+                anonymous_id: _ct_anon_id,
+                user_id: _ct_user_id,
+                ctgid: _ct_gid,
+                resolved_at: Date.now(),
+                allowDuplicate: true
+              });
+            }
+          }
+        })
+        .catch(function() {});
+    }
+  }
+  _ct_resolveUserAsync();
+
+  // ── 12. IndexedDB Critical Store (Purchase, Lead, FTD, Deposit) ─
+  var _ct_criticalStore = {
+    db: null,
+    ready: false,
+    init: function() {
+      try {
+        if (!w.indexedDB) return;
+        var req = w.indexedDB.open('CT_CRITICAL_STORE', 1);
+        req.onupgradeneeded = function(e) {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains('critical_events')) {
+            db.createObjectStore('critical_events', { keyPath: 'event_id' });
+          }
+        };
+        req.onsuccess = function(e) {
+          _ct_criticalStore.db = e.target.result;
+          _ct_criticalStore.ready = true;
+          _ct_criticalStore.recover();
+        };
+      } catch (e) {}
+    },
+    put: function(eventObj) {
+      try {
+        if (!_ct_criticalStore.ready || !_ct_criticalStore.db) return;
+        var tx = _ct_criticalStore.db.transaction('critical_events', 'readwrite');
+        var st = tx.objectStore('critical_events');
+        eventObj._stored_at = Date.now();
+        st.put(eventObj);
+        _ct_metrics.events_persisted++;
+      } catch (e) {}
+    },
+    remove: function(eventId) {
+      try {
+        if (!_ct_criticalStore.ready || !_ct_criticalStore.db || !eventId) return;
+        var tx = _ct_criticalStore.db.transaction('critical_events', 'readwrite');
+        tx.objectStore('critical_events').delete(eventId);
+      } catch (e) {}
+    },
+    recover: function() {
+      try {
+        if (!_ct_criticalStore.ready || !_ct_criticalStore.db) return;
+        var tx = _ct_criticalStore.db.transaction('critical_events', 'readonly');
+        var req = tx.objectStore('critical_events').getAll();
+        req.onsuccess = function(e) {
+          var items = e.target.result || [];
+          var now = Date.now();
+          var ttl = 86400000; // 24 hours
+          for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            if (now - (item._stored_at || 0) < ttl) {
+              delete item._stored_at;
+              _ct_metrics.events_recovered++;
+              _ct_enqueue(item, PRIORITY_CRITICAL);
+            } else {
+              _ct_criticalStore.remove(item.event_id);
+            }
+          }
+        };
+      } catch (e) {}
+    }
+  };
+  _ct_criticalStore.init();
+
+  // ── 13. Priority Queue & Hard Bound Limits ──────────────────────
+  var PRIORITY_CRITICAL = 1;
+  var PRIORITY_NORMAL = 2;
+  var PRIORITY_LOW = 3;
+
+  var _ct_criticalEvents = {
+    'purchase': 1, 'lead': 1, 'ftd': 1, 'deposit': 1, 'signup': 1, 'conversion': 1,
+    'register': 1, 'registro': 1, 'leads': 1, 'whatsapp': 1, 'firstdeposit': 1
+  };
+  var _ct_lowEvents = {
+    'scroll depth': 1, 'scroll': 1, 'contact click': 1, 'file download': 1,
+    'outbound click': 1, 'click action': 1, 'engagement': 1
+  };
+
+  function _ct_getPriority(evType) {
+    var lower = String(evType || '').toLowerCase().trim();
+    if (_ct_criticalEvents[lower]) return PRIORITY_CRITICAL;
+    if (_ct_lowEvents[lower]) return PRIORITY_LOW;
+    return PRIORITY_NORMAL;
+  }
+
+  var _ct_queue = [];
+  var MAX_QUEUE_SIZE = 500;
+  var MAX_BATCH_SIZE = 20;
+  var MAX_BATCH_BYTES = 60000;
+  var FLUSH_INTERVAL = 800;
+  var MAX_IN_FLIGHT = 2;
+  var MAX_RETRIES = 3;
+  var inFlightRequests = 0;
+  var _ct_flushTimer = null;
+
+  function _ct_enqueue(eventObj, priority) {
+    if (priority === PRIORITY_CRITICAL) {
+      _ct_criticalStore.put(eventObj);
+    }
+
+    if (_ct_queue.length >= MAX_QUEUE_SIZE) {
+      var dropIdx = -1;
+      for (var i = 0; i < _ct_queue.length; i++) {
+        if (_ct_queue[i]._priority === PRIORITY_LOW) {
+          dropIdx = i;
+          break;
+        }
+      }
+      if (dropIdx === -1) {
+        for (var j = 0; j < _ct_queue.length; j++) {
+          if (_ct_queue[j]._priority === PRIORITY_NORMAL) {
+            dropIdx = j;
+            break;
+          }
+        }
+      }
+      if (dropIdx !== -1) {
+        _ct_queue.splice(dropIdx, 1);
+        _ct_metrics.events_dropped++;
+        _ct_log('Queue full: dropped event of lower priority');
+      } else {
+        if (priority > PRIORITY_CRITICAL) {
+          _ct_metrics.events_dropped++;
+          return;
+        }
+      }
+    }
+
+    eventObj._priority = priority;
+    _ct_queue.push(eventObj);
+    _ct_metrics.events_queued++;
+    _ct_metrics.queue_size = _ct_queue.length;
+
+    _ct_log('Event queued:', eventObj.type, 'Queue length:', _ct_queue.length);
+
+    if (_ct_queue.length >= MAX_BATCH_SIZE) {
+      _ct_flush(false);
+    } else if (!_ct_flushTimer) {
+      _ct_flushTimer = setTimeout(function() {
+        _ct_flushTimer = null;
+        _ct_flush(false);
+      }, FLUSH_INTERVAL);
+    }
+  }
+
+  // ── 14. High-Scale Transport Engine: Isolated Retries & Backoff ─
+  function _ct_sendBatch(batchState) {
+    if (!batchState || !batchState.events || batchState.events.length === 0) return;
+    inFlightRequests++;
+
+    var bodyPayload = {
+      sdk_version: _ct_sdk_version,
+      account: _ct_account,
+      batch_id: batchState.batch_id,
+      sent_at: Date.now(),
+      events: batchState.events
+    };
+
+    var bodyJson = _ct_safeStringify(bodyPayload);
+    var batchUrl = _ct_api + '/events/batch';
+
+    function onBatchSuccess(respJson) {
+      inFlightRequests--;
+      _ct_metrics.batches_sent++;
+      _ct_metrics.events_sent += batchState.events.length;
+      _ct_log('Batch sent successfully (' + batchState.events.length + ' events), batch_id:', batchState.batch_id);
+
+      // Clean up critical store entries upon confirmation
+      for (var k = 0; k < batchState.events.length; k++) {
+        _ct_criticalStore.remove(batchState.events[k].event_id);
+      }
+
+      try {
+        if (typeof w.dispatchEvent === 'function' && typeof w.CustomEvent === 'function') {
+          w.dispatchEvent(new CustomEvent('ct:event-sent', {
+            detail: { batch_id: batchState.batch_id, count: batchState.events.length, events: batchState.events }
+          }));
+        }
+      } catch (e) {}
+
+      if (_ct_queue.length > 0) {
+        setTimeout(function() { _ct_flush(false); }, 40);
+      }
+    }
+
+    function onBatchFailure(err, statusCode, retryAfterHeader) {
+      inFlightRequests--;
+      _ct_metrics.batches_failed++;
+
+      // Non-retryable client errors (400, 401, 403, 404, 413, 422)
+      if (statusCode && statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
+        _ct_log('Non-retryable client error (' + statusCode + '). Dropping batch:', batchState.batch_id);
+        return;
+      }
+
+      // Exponential backoff isolated to this batch alone
+      if (batchState.attempt < MAX_RETRIES) {
+        batchState.attempt++;
+        _ct_metrics.batches_retried++;
+
+        var delay = Math.min(4000, 500 * Math.pow(2, batchState.attempt - 1)) + Math.floor(Math.random() * 200);
+        if (statusCode === 429 && retryAfterHeader) {
+          var raSec = parseInt(retryAfterHeader, 10);
+          if (!isNaN(raSec) && raSec > 0) {
+            delay = Math.min(30000, raSec * 1000);
+          }
+        }
+
+        _ct_log('Batch ' + batchState.batch_id + ' failed. Retrying in ' + delay + 'ms (attempt ' + batchState.attempt + ')');
+        setTimeout(function() {
+          _ct_sendBatch(batchState);
+        }, delay);
+      } else {
+        _ct_log('Max retries exceeded for batch ' + batchState.batch_id + '. Dropping batch.');
+      }
+    }
+
+    if (_ct_fetch) {
+      _ct_fetch(batchUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: bodyJson,
+        keepalive: true,
+        cache: 'no-store',
+        credentials: 'omit',
+        mode: 'cors'
+      }).then(function(res) {
+        if (res && (res.status === 200 || res.status === 202)) {
+          res.json().then(onBatchSuccess).catch(function() { onBatchSuccess({}); });
+        } else {
+          var ra = res ? (res.headers ? res.headers.get('Retry-After') : null) : null;
+          onBatchFailure(null, res ? res.status : 500, ra);
+        }
+      }).catch(function(err) {
+        onBatchFailure(err, 0, null);
+      });
+    } else {
+      onBatchFailure(new Error('No fetch available'), 0, null);
+    }
+  }
+
+  function _ct_flush(isSync) {
+    if (_ct_queue.length === 0) return;
+    if (w.navigator && w.navigator.onLine === false) return;
+    if (inFlightRequests >= MAX_IN_FLIGHT && !isSync) return;
+
+    var rawBatch = _ct_queue.splice(0, MAX_BATCH_SIZE);
+    _ct_metrics.queue_size = _ct_queue.length;
+
+    var payloadEvents = [];
+    for (var i = 0; i < rawBatch.length; i++) {
+      var item = Object.assign({}, rawBatch[i]);
+      delete item._priority;
+      payloadEvents.push(item);
+    }
+
+    var batchState = {
+      batch_id: _ct_uuid(),
+      attempt: 0,
+      created_at: Date.now(),
+      events: payloadEvents
+    };
+
+    if (isSync) {
+      _ct_flushBatchSync(batchState);
+      return;
+    }
+
+    _ct_sendBatch(batchState);
+  }
+
+  function _ct_flushBatchSync(batchState) {
+    var bodyPayload = {
+      sdk_version: _ct_sdk_version,
+      account: _ct_account,
+      batch_id: batchState.batch_id,
+      sent_at: Date.now(),
+      events: batchState.events
+    };
+    var bodyJson = _ct_safeStringify(bodyPayload);
+    var sent = false;
+
+    if (w.navigator && typeof w.navigator.sendBeacon === 'function') {
+      try {
+        var payload = (typeof Blob === 'function') ? new Blob([bodyJson], { type: 'text/plain;charset=UTF-8' }) : bodyJson;
+        sent = w.navigator.sendBeacon(_ct_api + '/events/batch', payload);
+      } catch (e) {
+        try {
+          sent = w.navigator.sendBeacon(_ct_api + '/events/batch', bodyJson);
+        } catch (e2) {}
+      }
+    }
+
+    if (sent) {
+      _ct_metrics.events_sent += batchState.events.length;
+      _ct_metrics.batches_sent++;
+      for (var k = 0; k < batchState.events.length; k++) {
+        _ct_criticalStore.remove(batchState.events[k].event_id);
+      }
+    } else {
+      // If sendBeacon failed, keep critical events safely in IndexedDB
+      for (var j = 0; j < batchState.events.length; j++) {
+        if (_ct_getPriority(batchState.events[j].type) === PRIORITY_CRITICAL) {
+          _ct_criticalStore.put(batchState.events[j]);
+        }
+      }
+    }
+  }
+
+  function flushOnPageHide() {
+    while (_ct_queue.length > 0) {
+      var chunk = _ct_queue.splice(0, MAX_BATCH_SIZE);
+      var payloadEvents = [];
+      for (var i = 0; i < chunk.length; i++) {
+        var item = Object.assign({}, chunk[i]);
+        delete item._priority;
+        payloadEvents.push(item);
+      }
+      var bState = {
+        batch_id: _ct_uuid(),
+        attempt: 0,
+        created_at: Date.now(),
+        events: payloadEvents
+      };
+      _ct_flushBatchSync(bState);
+    }
+    _ct_metrics.queue_size = _ct_queue.length;
+  }
+
+  w.addEventListener('online', function() {
+    _ct_log('Network online. Flushing queue.');
+    _ct_flush(false);
+  });
+
+  w.addEventListener('pagehide', flushOnPageHide);
+  w.addEventListener('beforeunload', flushOnPageHide);
+
+  // ── 15. Event Normalization & sendEventTracking ────────────────
+  var _ct_seenEvents = {};
+
+  w.sendEventTracking = function(eventType, eventData) {
+    if (!eventType) return;
+
+    var _ct_custom = (typeof eventData === 'object' && eventData !== null) ? eventData : (eventData ? { value: eventData } : {});
+    var _ct_isAllowDup = !!_ct_custom.allowDuplicate;
+
+    var _ct_cleanData = {};
+    for (var _dk in _ct_custom) {
+      if (_ct_custom.hasOwnProperty(_dk) && _dk !== 'allowDuplicate') {
+        _ct_cleanData[_dk] = _ct_custom[_dk];
+      }
+    }
+
+    var _ct_explicitId = _ct_cleanData.event_id || _ct_cleanData.eventId || '';
+    var _ct_transId = _ct_cleanData.transaction_id || _ct_cleanData.transactionId ||
+                      _ct_cleanData.order_id || _ct_cleanData.orderId || '';
+
+    if (_ct_explicitId) {
+      var _ct_dedupKey = eventType + '__' + _ct_explicitId;
+      if (!_ct_isAllowDup && _ct_seenEvents[_ct_dedupKey]) {
+        _ct_metrics.events_deduplicated++;
+        return;
+      }
+      _ct_seenEvents[_ct_dedupKey] = true;
+    } else if (_ct_transId) {
+      var _ct_orderKey = eventType + '__' + _ct_transId;
+      if (!_ct_isAllowDup && _ct_seenEvents[_ct_orderKey]) {
+        _ct_metrics.events_deduplicated++;
+        return;
+      }
+      _ct_seenEvents[_ct_orderKey] = true;
+    }
+
+    _ct_updateActivity(Date.now());
+    var _ct_top = Math.round((Date.now() - _ct_pageStartedAt) / 1000);
+    // event_id is ALWAYS a unique UUID representing this event instance
+    var _ct_eventId = _ct_explicitId || _ct_uuid();
+    var priority = _ct_getPriority(eventType);
+
+    var _ct_effChannel = _ct_channel;
+    var _ct_effSource = _ct_utm.source;
+    var _ct_effMedium = _ct_utm.medium;
+    var _ct_effCampaign = _ct_utm.campaign;
+    var _ct_effTerm = _ct_utm.term;
+    var _ct_effContent = _ct_utm.content;
+    var _ct_effUtmId = _ct_utm.id;
+
+    if (!_ct_hasCampaign && _ct_lastTouch) {
+      if (!_ct_effChannel || _ct_effChannel === 'Direct') {
+        _ct_effChannel = _ct_lastTouch.channel || _ct_effChannel;
+      }
+      _ct_effSource   = _ct_effSource   || _ct_lastTouch.source   || _ct_lastTouch.utm_source   || '';
+      _ct_effMedium   = _ct_effMedium   || _ct_lastTouch.medium   || _ct_lastTouch.utm_medium   || '';
+      _ct_effCampaign = _ct_effCampaign || _ct_lastTouch.campaign || _ct_lastTouch.utm_campaign || '';
+      _ct_effTerm     = _ct_effTerm     || _ct_lastTouch.term     || _ct_lastTouch.utm_term     || '';
+      _ct_effContent  = _ct_effContent  || _ct_lastTouch.content  || _ct_lastTouch.utm_content  || '';
+      _ct_effUtmId    = _ct_effUtmId    || _ct_lastTouch.utm_id   || '';
+    }
+
+    var _ct_effClicks = {};
+    for (var _k in _ct_clicks) {
+      if (_ct_clicks.hasOwnProperty(_k)) {
+        _ct_effClicks[_k] = _ct_clicks[_k] || (!_ct_hasCampaign && _ct_lastTouch ? (_ct_lastTouch[_k] || '') : '');
+      }
+    }
+
+    var _ct_cleanUrl = _ct_sanitizeUrl(_ct_loc.href);
+    var _ct_cleanRef = _ct_sanitizeUrl(_ct_ref);
+
+    var _ct_payload = {
+      event_id: _ct_eventId,
+      page_view_id: _ct_pageViewId,
+      timestamp: Date.now(),
+      type: eventType,
+      anonymous_id: _ct_anon_id,
+      user_id: _ct_user_id,
+      userid: _ct_user_id || _ct_anon_id, // legacy field
+      account: _ct_account,
+      host: _ct_loc.hostname || '',
+      path: _ct_loc.pathname || '',
+      url: _ct_cleanUrl,
+      title: d.title || '',
+      impressionId: _ct_gid,
+      sessionId: _ct_sid,
+      sessionNum: _ct_snum,
+      timeOnPage: _ct_top,
+      device: _ct_device,
+      screen: _ct_screen,
+      viewport: _ct_viewport,
+      language: _ct_lang,
+      tz: _ct_tz,
+      referrer: _ct_cleanRef,
+      ref_host: _ct_refHost,
+      channel: _ct_effChannel,
+      current_channel: _ct_channel,
+      attribution_version: _ct_attrVer,
+      utm_source: _ct_effSource,
+      utm_medium: _ct_effMedium,
+      utm_campaign: _ct_effCampaign,
+      utm_term: _ct_effTerm,
+      utm_content: _ct_effContent,
+      utm_id: _ct_effUtmId,
+      gclid: _ct_effClicks.gclid,
+      dclid: _ct_effClicks.dclid,
+      wbraid: _ct_effClicks.wbraid,
+      gbraid: _ct_effClicks.gbraid,
+      fbclid: _ct_effClicks.fbclid,
+      _fbc: _ct_effClicks._fbc,
+      msclkid: _ct_effClicks.msclkid,
+      ttclid: _ct_effClicks.ttclid,
+      twclid: _ct_effClicks.twclid,
+      li_fat_id: _ct_effClicks.li_fat_id,
+      ScCid: _ct_clicks.ScCid,
+      epik: _ct_effClicks.epik,
+      rdt_cid: _ct_effClicks.rdt_cid,
+      ttd_clkid: _ct_effClicks.ttd_clkid,
+      tdid: _ct_effClicks.tdid,
+      xandr_uid: _ct_effClicks.xandr_uid,
+      anj_uid: _ct_effClicks.anj_uid,
+      sa_cid: _ct_effClicks.sa_cid,
+      prp_click_id: _ct_effClicks.prp_click_id,
+      gum: _ct_effClicks.gum,
+      adtk: _ct_effClicks.adtk,
+      is_click_id: _ct_effClicks.is_click_id,
+      btag: _ct_effClicks.btag,
+      afid: _ct_effClicks.afid,
+      aff_click_id: _ct_effClicks.aff_click_id,
+      ctgid: _ct_effClicks.ctgid || '',
+      data: _ct_cleanData
+    };
+
+    if (_ct_transId) {
+      _ct_payload.transaction_id = _ct_transId;
+      _ct_payload.deduplication_key = (_ct_account + ':' + eventType + ':' + _ct_transId).toLowerCase();
+    }
+
+    if (priority === PRIORITY_CRITICAL || eventType === 'Page View') {
+      _ct_payload.attribution_snapshot = _ct_getAttributionSnapshot();
+    }
+
+    _ct_metrics.events_created++;
+    _ct_enqueue(_ct_payload, priority);
+  };
+
+  // ── 16. containerLayer Nested Events & Prequeue Handling ───────
+  var _ct_layer = w.containerLayer = w.containerLayer || [];
+  _ct_layer.state = {
+    anonymous_id: _ct_anon_id,
+    user_id: _ct_user_id,
+    account: _ct_account,
+    channel: _ct_channel,
+    sessionId: _ct_sid,
+    device: _ct_device,
+    metrics: _ct_metrics
+  };
+
+  var _ct_pendingLayerItems = [];
+  var _ct_isProcessingLayer = false;
+
+  function _ct_executeLayerItem(item) {
+    if (!item) return;
+    try {
+      if (typeof item === 'object' && !Array.isArray(item)) {
+        var evName = item.event || item.type;
+        if (evName && typeof evName === 'string') {
+          var copy = {};
+          for (var k in item) {
+            if (item.hasOwnProperty(k) && k !== 'event' && k !== 'type') {
+              copy[k] = item[k];
+            }
+          }
+          w.sendEventTracking(evName, copy);
+        }
+      } else if (Array.isArray(item) && item[0] === 'event' && item[1]) {
+        w.sendEventTracking(item[1], item[2] || {});
+      }
+    } catch (e) {}
+  }
+
+  function _ct_processLayerItem(item) {
+    _ct_pendingLayerItems.push(item);
+    if (_ct_isProcessingLayer) return;
+    _ct_isProcessingLayer = true;
+    while (_ct_pendingLayerItems.length > 0) {
+      var nextItem = _ct_pendingLayerItems.shift();
+      _ct_executeLayerItem(nextItem);
+    }
+    _ct_isProcessingLayer = false;
+  }
+
+  var _ct_origPush = _ct_layer.push.bind(_ct_layer);
+  _ct_layer.push = function() {
+    for (var i = 0; i < arguments.length; i++) {
+      var it = arguments[i];
+      _ct_origPush(it);
+      _ct_processLayerItem(it);
+    }
+    return _ct_layer.length;
+  };
+
+  // Process prequeued items safely
+  for (var _cli = 0; _cli < _ct_layer.length; _cli++) {
+    var preItem = _ct_layer[_cli];
+    if (preItem && (preItem.event || preItem.type || Array.isArray(preItem))) {
+      _ct_processLayerItem(preItem);
+    }
+  }
+
+  // ── 17. Modern window.CTAG API ─────────────────────────────────
+  w.CTAG = {
+    version: _ct_sdk_version,
+    account: _ct_account,
+    metrics: _ct_metrics,
+    state: _ct_layer.state,
+    track: function(name, data) { w.sendEventTracking(name, data); },
+    flush: function() { _ct_flush(false); },
+    getIdentity: function() {
+      return {
+        anonymous_id: _ct_anon_id,
+        user_id: _ct_user_id,
+        ctgid: _ct_gid,
+        session_id: _ct_sid
+      };
+    },
+    getAttribution: _ct_getAttributionSnapshot
+  };
+
+  // ── 18. Tag Manager Injections ─────────────────────────────────
+  
+
+  function _ct_init() {
+    try {
+      try{}catch(e){};try{if (window.location.href.match('payU')) {
+    pixie('event', 'Deposito');
+    pixie('event', 'FTD');
+}}catch(e){};try{let source;
+let medium;
+let campaign;
+let content;
+
+if (window.location.href.match('utm')) {
+    if(window.location.search.split('&')[0]) {
+        source = window.location.search.split('&')[0].split('=')[1];
+    } else {
+        source = '';
+    }
+    if(window.location.search.split('&')[1]) {
+        medium = window.location.search.split('&')[1].split('=')[1];
+    } else {
+        medium = '';
+    }
+    if(window.location.search.split('&')[2]) {
+        campaign = window.location.search.split('&')[2].split('=')[1];
+    } else {
+        campaign = '';
+    }
+    if(window.location.search.split('&')[3]) {
+        content = window.location.search.split('&')[3].split('=')[1];
+    } else {
+        content = '';
+    }
+    sessionStorage.setItem('cm_cnm_source', source);
+    sessionStorage.setItem('cm_cnm_medium', medium);
+    sessionStorage.setItem('cm_cnm_campaign', campaign);
+    sessionStorage.setItem('cm_cnm_content', content);
+}}catch(e){};try{(function() {
+  const blockedDomain = "load.b.byads.co";
+  const originalFetch = window.fetch;
+  window.fetch = function(...args) {
+    if (args[0] && args[0].toString().includes(blockedDomain)) {
+      return Promise.reject(new Error("Dominio bloqueado"));
+    }
+    return originalFetch.apply(this, args);
+  };
+  const originalXHROpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    if (url.includes(blockedDomain)) {
+      return;
+    }
+    return originalXHROpen.apply(this, arguments);
+  };
+
+  const OriginalWebSocket = window.WebSocket;
+  window.WebSocket = function(url, protocols) {
+    if (url.includes(blockedDomain)) {
+      throw new Error("WebSocket bloqueado");
+    }
+    return new OriginalWebSocket(url, protocols);
+  };
+
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      [...mutation.addedNodes].forEach(node => {
+        if (node.tagName) {
+          const tag = node.tagName.toLowerCase();
+          const src = node.src || node.href || (tag === "iframe" && node.getAttribute("src"));
+
+          if (src && src.includes(blockedDomain)) {
+    
+            node.remove();
+          }
+        }
+      });
+    });
+  });
+
+  observer.observe(document.documentElement || document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  document.querySelectorAll("script, iframe, link, img").forEach(el => {
+    const src = el.src || el.href || el.getAttribute("src");
+    if (src && src.includes(blockedDomain)) {
+      el.remove();
+    }
+  });
+})();
+}catch(e){};try{if (window.location.href.match('utm')) {
+    const params = new URLSearchParams(window.location.search);
+
+    const utms = {
+        utm_source: params.get('utm_source'),
+        utm_medium: params.get('utm_medium'),
+        utm_campaign: params.get('utm_campaign'),
+        utm_content: params.get('utm_content'),
+        utm_term: params.get('utm_term')
+    };
+
+    localStorage.setItem('CTGID', JSON.stringify(utms));
+
+    sendEventTracking("viewMediums");
+}}catch(e){};try{
+
+window.addEventListener("load",()=>{if(!location.href.includes("registrarse"))return;const e=document.querySelector("#register-form > div > form > div:nth-child(4) > div:nth-child(3) > input");e&&e.addEventListener("change",()=>{const t=e.value.trim(),n=localStorage.getItem("CTUUID");if(t.length<=5)return;const o="https://ctag.containermedia.net/api/s2s/secure/";fetch(`${o}?${new URLSearchParams({id:"693051181bcd157b312610bd",phone:t,userid:n||"",site:"BP"})}`,{method:"GET",credentials:"omit"}),fetch(`${o}?${new URLSearchParams({id:"69305b8f1bcd157b312b2dcd",phone:t,userid:n||""})}`,{method:"GET",credentials:"omit"})})});}catch(e){};try{(function () {
+  var _gk = '\x61\x74\x74\x72\x5f\x64\x6f\x6e\x65';
+  var _configs = [
+    //s
+    {
+      base: '\x68\x74\x74\x70\x73\x3a\x2f\x2f\x62\x65\x74\x70\x6c\x61\x79\x2e\x63\x6f\x6d\x2e\x63\x6f\x2f\x72\x65\x67\x69\x73\x74\x72\x61\x72\x73\x65',
+      rate: 50,
+      sk:   '\x61\x74\x74\x72\x5f\x73\x61\x6d\x70\x6c\x65\x5f\x31',
+      params: {
+        s: '\x63\x6e\x6d\x5f\x73\x70\x6f\x72\x74\x73\x61\x64\x73',
+        m: '\x64\x69\x73\x70\x6c\x61\x79',
+        c: '\x63\x6e\x6d\x5f\x72\x65\x67\x69\x73\x74\x65\x72'
+      }
+    },
+    //sl
+    {
+      base: '\x68\x74\x74\x70\x73\x3a\x2f\x2f\x62\x65\x74\x70\x6c\x61\x79\x2e\x63\x6f\x6d\x2e\x63\x6f\x2f\x72\x65\x67\x69\x73\x74\x72\x61\x72\x73\x65',
+      rate: 50,
+      sk:   '\x61\x74\x74\x72\x5f\x73\x61\x6d\x70\x6c\x65\x5f\x32',
+      params: {
+        s: '\x63\x6e\x6d\x5f\x73\x6c\x6f\x74\x73\x61\x64\x73',
+        m: '\x64\x69\x73\x70\x6c\x61\x79',
+        c: '\x63\x6e\x6d\x5f\x72\x65\x67\x69\x73\x74\x65\x72'
+      }
+    }
+  ];
+  if (sessionStorage.getItem(_gk)) return;
+  function _isMob() {
+    return /\x41\x6e\x64\x72\x6f\x69\x64|\x77\x65\x62\x4f\x53|\x69\x50\x68\x6f\x6e\x65|\x69\x50\x61\x64|\x69\x50\x6f\x64|\x42\x6c\x61\x63\x6b\x42\x65\x72\x72\x79|\x49\x45\x4d\x6f\x62\x69\x6c\x65|\x4f\x70\x65\x72\x61\x20\x4d\x69\x6e\x69/i
+      .test(navigator.userAgent);
+  }
+  function _isValidSrc() {
+    var _lurl = window.location.href.toLowerCase();
+    var _refr = (document.referrer || '').toLowerCase();
+    if (_lurl.indexOf('\x75\x74\x6d\x5f') !== -1) return false;
+    if (_refr.indexOf('\x66\x61\x63\x65\x62\x6f\x6f\x6b') !== -1 || _refr.indexOf('\x66\x62\x2e\x63\x6f\x6d') !== -1) {
+      return false;
+    }
+    if (_refr === '' ||
+        _refr.indexOf('\x67\x6f\x6f\x67\x6c\x65') !== -1 ||
+        _refr.indexOf('\x64\x69\x73\x70\x6c\x61\x79') !== -1 ||
+        _refr.indexOf('\x70\x75\x73\x68') !== -1) {
+      return true;
+    }
+    return false;
+  }
+  function _sendAnalytics(base, src, med, camp) {
+    try {
+      if (typeof gtag === '\x66\x75\x6e\x63\x74\x69\x6f\x6e') {
+        gtag('\x65\x76\x65\x6e\x74', '\x70\x61\x67\x65\x5f\x76\x69\x65\x77', {
+          '\x70\x61\x67\x65\x5f\x6c\x6f\x63\x61\x74\x69\x6f\x6e':    base,
+          '\x63\x61\x6d\x70\x61\x69\x67\x6e\x5f\x73\x6f\x75\x72\x63\x65': src,
+          '\x63\x61\x6d\x70\x61\x69\x67\x6e\x5f\x6d\x65\x64\x69\x75\x6d': med,
+          '\x63\x61\x6d\x70\x61\x69\x67\x6e\x5f\x6e\x61\x6d\x65':         camp
+        });
+      } else if (typeof ga === '\x66\x75\x6e\x63\x74\x69\x6f\x6e') {
+        ga('\x73\x65\x74', '\x63\x61\x6d\x70\x61\x69\x67\x6e\x53\x6f\x75\x72\x63\x65', src);
+        ga('\x73\x65\x74', '\x63\x61\x6d\x70\x61\x69\x67\x6e\x4d\x65\x64\x69\x75\x6d',  med);
+        ga('\x73\x65\x74', '\x63\x61\x6d\x70\x61\x69\x67\x6e\x4e\x61\x6d\x65',          camp);
+        ga('\x73\x65\x6e\x64', '\x70\x61\x67\x65\x76\x69\x65\x77');
+      }
+    } catch (e) {}
+  }
+  function _isActive(cfg) {
+    var _s = sessionStorage.getItem(cfg.sk);
+    if (_s === null) {
+      _s = (Math.random() * 100 <= cfg.rate) ? '\x31' : '\x30';
+      sessionStorage.setItem(cfg.sk, _s);
+    }
+    return _s === '\x31';
+  }
+  function assignUtm(cfg) {
+    if (!_isActive(cfg)) return;
+    if (!_isMob() || !_isValidSrc()) return;
+
+    var _loc  = window.location.href;
+    var _base = _loc.split('\x3f')[0];
+
+    if (_base === cfg.base) {
+      var _url = cfg.base
+        + '\x3f\x75\x74\x6d\x5f\x73\x6f\x75\x72\x63\x65\x3d'    + cfg.params.s
+        + '\x26\x75\x74\x6d\x5f\x6d\x65\x64\x69\x75\x6d\x3d'    + cfg.params.m
+        + '\x26\x75\x74\x6d\x5f\x63\x61\x6d\x70\x61\x69\x67\x6e\x3d' + cfg.params.c;
+      _sendAnalytics(cfg.base, cfg.params.s, cfg.params.m, cfg.params.c);
+      sessionStorage.setItem(_gk, '\x31');
+      window.location.replace(_url);
+    }
+  }
+  for (var i = 0; i < _configs.length; i++) {
+    assignUtm(_configs[i]);
+    if (sessionStorage.getItem(_gk)) break;
+  }
+  var _ev = [
+    '\x65\x76\x65\x6e\x74\x6f\x5f\x69\x6e\x73\x63\x72\x69\x70\x63\x69\x6f\x6e\x5f\x65\x78\x69\x74\x6f\x73\x61',
+    '\x70\x75\x72\x63\x68\x61\x73\x65'
+  ];
+  var _activeParams = null;
+  for (var j = 0; j < _configs.length; j++) {
+    var _s = sessionStorage.getItem(_configs[j].sk);
+    if (_s === '\x31') { _activeParams = _configs[j].params; break; }
+  }
+  if (!_activeParams) _activeParams = _configs[0].params;
+  var _utmParams = {
+    '\x63\x61\x6d\x70\x61\x69\x67\x6e\x5f\x73\x6f\x75\x72\x63\x65': _activeParams.s,
+    '\x63\x61\x6d\x70\x61\x69\x67\x6e\x5f\x6d\x65\x64\x69\x75\x6d': _activeParams.m,
+    '\x63\x61\x6d\x70\x61\x69\x67\x6e\x5f\x6e\x61\x6d\x65':         _activeParams.c
+  };
+  function _hookConversionEvents() {
+    if (typeof gtag === '\x66\x75\x6e\x63\x74\x69\x6f\x6e') {
+      var _origGtag = gtag;
+      window['\x67\x74\x61\x67'] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        if (args[0] === '\x65\x76\x65\x6e\x74' && _ev.indexOf(args[1]) !== -1) {
+          args[2] = args[2] || {};
+          for (var k in _utmParams) {
+            if (_utmParams.hasOwnProperty(k)) {
+              args[2][k] = _utmParams[k];
+            }
+          }
+        }
+        return _origGtag.apply(this, args);
+      };
+    }
+    if (typeof ga === '\x66\x75\x6e\x63\x74\x69\x6f\x6e') {
+      var _origGa = ga;
+      window['\x67\x61'] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        if (args[0] === '\x73\x65\x6e\x64' && args[1] === '\x65\x76\x65\x6e\x74' && _ev.indexOf(args[3]) !== -1) {
+          try {
+            _origGa('\x73\x65\x74', '\x63\x61\x6d\x70\x61\x69\x67\x6e\x53\x6f\x75\x72\x63\x65', _activeParams.s);
+            _origGa('\x73\x65\x74', '\x63\x61\x6d\x70\x61\x69\x67\x6e\x4d\x65\x64\x69\x75\x6d',  _activeParams.m);
+            _origGa('\x73\x65\x74', '\x63\x61\x6d\x70\x61\x69\x67\x6e\x4e\x61\x6d\x65',          _activeParams.c);
+          } catch (e) {}
+        }
+        return _origGa.apply(this, args);
+      };
+    }
+  }
+  _hookConversionEvents();
+})();}catch(e){};
+      
+    } catch (e) {}
+  }
+  _ct_init();
+
+  // ── 19. Smart Click & Interaction Tracking (with handled flag) ─
+  w.addEventListener('click', function(event) {
+    try {
+      try{if (event.target.id === 'btnRegisterReal') {
+    sendEventTracking("Leads");
+}}catch(e){};
+      
+    } catch (e) {}
+
+    // Respect handled flag from tag manager rules
+    if (event.__ctHandled && !event.__ctAllowAutoTracking) {
+      return;
+    }
+
+    try {
+      var target = event.target;
+      if (!target) return;
+      var el = null;
+      var curr = target;
+      while (curr && curr !== d.body && curr !== d.documentElement) {
+        var tname = (curr.tagName || '').toLowerCase();
+        if (tname === 'a' || tname === 'button' || curr.getAttribute('data-ct-event') ||
+            curr.getAttribute('data-analytics-event') || curr.getAttribute('role') === 'button' ||
+            (tname === 'input' && (curr.type === 'submit' || curr.type === 'button'))) {
+          el = curr;
+          break;
+        }
+        curr = curr.parentElement;
+      }
+      if (!el) return;
+
+      var tag = (el.tagName || '').toLowerCase();
+      var customEv = el.getAttribute('data-ct-event') || el.getAttribute('data-analytics-event');
+      var label = (el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || el.value || '').trim().substring(0, 100);
+      var elId = el.id || '';
+      var elClass = (typeof el.className === 'string') ? el.className.trim().substring(0, 100) : '';
+
+      if (customEv) {
+        w.sendEventTracking(customEv, {
+          element_text: label,
+          element_id: elId,
+          element_class: elClass,
+          element_tag: tag
+        });
+        return;
+      }
+
+      if (tag === 'a') {
+        var href = el.getAttribute('href') || el.href || '';
+        if (!href || href === '#' || href.indexOf('javascript:') === 0) return;
+
+        if (href.indexOf('mailto:') === 0) {
+          w.sendEventTracking('Contact Click', {
+            contact_type: 'email',
+            target: href.replace('mailto:', ''),
+            text: label
+          });
+          return;
+        }
+        if (href.indexOf('tel:') === 0) {
+          w.sendEventTracking('Contact Click', {
+            contact_type: 'phone',
+            target: href.replace('tel:', ''),
+            text: label
+          });
+          return;
+        }
+
+        var isDownload = el.hasAttribute('download') || /.(pdf|xlsx?|docx?|zip|rar|csv|mp4|mov|dmg|exe|apk|txt|tar.gz)$/i.test(href.split('?')[0]);
+        if (isDownload) {
+          var extMatch = href.split('?')[0].match(/.([a-z0-9]+)$/i);
+          w.sendEventTracking('File Download', {
+            file_url: href,
+            extension: extMatch ? extMatch[1].toLowerCase() : '',
+            text: label
+          });
+          return;
+        }
+
+        try {
+          var linkUrl = new URL(href, w.location.href);
+          if (linkUrl.hostname && linkUrl.hostname !== w.location.hostname) {
+            w.sendEventTracking('Outbound Click', {
+              target_url: linkUrl.href,
+              target_host: linkUrl.hostname,
+              text: label
+            });
+            return;
+          }
+        } catch (e) {}
+      }
+
+      if (tag === 'button' || el.getAttribute('role') === 'button' || (tag === 'input' && (el.type === 'submit' || el.type === 'button'))) {
+        if (label || elId) {
+          w.sendEventTracking('Click Action', {
+            element_text: label,
+            element_id: elId,
+            element_class: elClass,
+            element_tag: tag
+          });
+        }
+      }
+    } catch (e) {}
+  });
+
+  // ── 20. Scroll Depth Tracking (Milestones 25%, 50%, 75%, 90%) ───
+  var _ct_scrollMilestones = {};
+  function _ct_checkScroll() {
+    try {
+      var docEl = d.documentElement;
+      var body = d.body;
+      var scrollTop = w.pageYOffset || docEl.scrollTop || (body ? body.scrollTop : 0);
+      var winHeight = w.innerHeight || docEl.clientHeight || 0;
+      var docHeight = Math.max(
+        body ? body.scrollHeight : 0,
+        body ? body.offsetHeight : 0,
+        docEl.clientHeight,
+        docEl.scrollHeight,
+        docEl.offsetHeight
+      );
+      if (docHeight <= winHeight + 50) return;
+      var pct = Math.min(100, Math.round(((scrollTop + winHeight) / docHeight) * 100));
+      var ms = [25, 50, 75, 90];
+      for (var mIdx = 0; mIdx < ms.length; mIdx++) {
+        var mVal = ms[mIdx];
+        if (pct >= mVal && !_ct_scrollMilestones[mVal]) {
+          _ct_scrollMilestones[mVal] = true;
+          w.sendEventTracking('Scroll Depth', {
+            depth: mVal,
+            percent: mVal + '%',
+            path: _ct_loc.pathname || '/',
+            title: d.title || ''
+          });
+        }
+      }
+    } catch (e) {}
+  }
+
+  var _ct_scrollThrottle = null;
+  w.addEventListener('scroll', function() {
+    if (_ct_scrollThrottle) return;
+    _ct_scrollThrottle = setTimeout(function() {
+      _ct_scrollThrottle = null;
+      _ct_checkScroll();
+    }, 250);
+  }, { passive: true });
+
+  // ── 21. SPA Navigation & Attribution Recalculation ─────────────
+  function refreshAttributionFromLocation(newLoc) {
+    var spaQp = _ct_extractParams(newLoc.search);
+    var spaGid = spaQp['ctgid'] || '';
+    if (spaGid && spaGid !== _ct_gid) {
+      _ct_gid = spaGid;
+      _ct_storage.set('CTGID', spaGid);
+      _ct_resolveUserAsync();
+    }
+
+    var spaUtm = _ct_buildUtm(spaQp);
+    var spaClicks = _ct_buildClicks(spaQp, spaGid);
+    var spaRefHost = _ct_refHost;
+    var spaIsExt = _ct_isExtRef;
+    var spaChannel = _ct_detectChannel(spaUtm, spaClicks, spaRefHost, spaIsExt);
+
+    var hasNewCamp = _ct_hasAttributableCampaign(spaUtm, spaClicks, spaGid, false);
+    if (hasNewCamp) {
+      _ct_channel = spaChannel;
+      _ct_utm = spaUtm;
+      _ct_clicks = spaClicks;
+      _ct_currentTouch = _ct_buildTouch(spaUtm, spaClicks, spaChannel, _ct_currentHref, newLoc, spaRefHost, spaIsExt);
+      _ct_lastTouch = Object.assign({}, _ct_currentTouch);
+      _ct_touches.push({
+        ts: _ct_currentTouch.ts,
+        channel: spaChannel,
+        source: _ct_currentTouch.source,
+        medium: _ct_currentTouch.medium,
+        campaign: _ct_currentTouch.campaign,
+        gclid: _ct_currentTouch.gclid,
+        fbclid: _ct_currentTouch.fbclid,
+        msclkid: _ct_currentTouch.msclkid,
+        sa_cid: _ct_currentTouch.sa_cid
+      });
+      if (_ct_touches.length > 15) _ct_touches.shift();
+
+      _ct_attrVer++;
+      _ct_storage.set('CT_ATTR_VERSION', String(_ct_attrVer));
+      _ct_storage.set('CT_LT', _ct_safeStringify(_ct_lastTouch));
+      _ct_storage.set('CT_TOUCHES', _ct_safeStringify(_ct_touches));
+
+      // Emit attribution_update internal event
+      w.sendEventTracking('attribution_update', {
+        attribution_version: _ct_attrVer,
+        snapshot: _ct_getAttributionSnapshot(),
+        allowDuplicate: true
+      });
+    }
+  }
+
+  var _ct_currentHref = w.location.href;
+  function _ct_onSpaNavigate() {
+    var newHref = w.location.href;
+    if (newHref !== _ct_currentHref) {
+      var prevHref = _ct_currentHref;
+      _ct_currentHref = newHref;
+      _ct_loc = w.location;
+      _ct_pageViewId = _ct_uuid(); // Unique UUID per page view prevents incorrect dedup
+      _ct_pageStartedAt = Date.now();
+      _ct_scrollMilestones = {};
+
+      refreshAttributionFromLocation(_ct_loc);
+
+      setTimeout(function() {
+        w.sendEventTracking('Page View', {
+          spa: true,
+          page_view_id: _ct_pageViewId,
+          previous_url: prevHref,
+          title: d.title || '',
+          allowDuplicate: true
+        });
+      }, 50);
+    }
+  }
+
+  if (w.history && typeof w.history.pushState === 'function') {
+    var _ct_origPushState = w.history.pushState;
+    w.history.pushState = function() {
+      var ret = _ct_origPushState.apply(this, arguments);
+      _ct_onSpaNavigate();
+      return ret;
+    };
+    var _ct_origReplaceState = w.history.replaceState;
+    w.history.replaceState = function() {
+      var ret = _ct_origReplaceState.apply(this, arguments);
+      _ct_onSpaNavigate();
+      return ret;
+    };
+  }
+  w.addEventListener('popstate', _ct_onSpaNavigate);
+  w.addEventListener('hashchange', _ct_onSpaNavigate);
+
+  // ── 22. Visibility Tracking ────────────────────────────────────
+  d.addEventListener('visibilitychange', function() {
+    if (d.visibilityState === 'hidden') {
+      _ct_updateActivity(Date.now());
+    }
+  });
+
+  // ── 23. Non-blocking Initial Page View ─────────────────────────
+  w.sendEventTracking('Page View', {
+    page_view_id: _ct_pageViewId,
+    allowDuplicate: true
+  });
+
+})(window, document);

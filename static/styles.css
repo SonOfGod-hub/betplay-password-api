@@ -1,0 +1,112 @@
+.torneo-content {
+  background-image: url('../img/torneo/ftorneo.webp');
+  background-size: 100% 100%;
+
+}
+
+div.mdc-checkbox__background{
+  border-radius: 50%;
+}
+
+#mat-mdc-checkbox-1 > div > div > div.mdc-checkbox__background > svg{
+  opacity: 0;
+}
+
+.torneo-content img {
+  width: 100%;
+}
+
+.torneo-content .btn-primary {
+  border-color: #ffcd00;
+  background-color: #ffcd00;
+  color: #002360;
+  font-weight: bold;
+}
+
+.torneo-content .btn-primary:hover {
+  border-color: #ffd528;
+  background-color: #ffd528;
+  color: #002360;
+}
+
+.torneo-content .mb-3 {
+  font-weight: bold;
+}
+
+.torneo-content .form-control {
+  background-color: rgb(107, 14, 47);
+}
+
+
+.torneo-content .content-table {
+  margin: 0 10px 0 50px;
+  max-width: 700px;
+  max-height: 66vh;
+  overflow: auto;
+  padding: 0 30px 0 0;
+
+}
+
+
+.torneo-content .content-table::-webkit-scrollbar {
+  -webkit-appearance: none;
+  width: 4px;
+}
+
+
+.torneo-content .content-table::-webkit-scrollbar-button:increment, .torneo-content .content-table::-webkit-scrollbar-button {
+  display: none;
+}
+
+
+.torneo-content .content-table::-webkit-scrollbar-thumb {
+
+  background-color: #6A0D2E;
+  border-radius: 15px;
+  box-shadow: 0 1px 1px -1px;
+}
+
+.torneo-content .content-table::-webkit-scrollbar-track {
+
+  border-radius: 2px;
+  background-clip: content-box;
+  border-radius: 6px;
+  border: solid 7px transparent;
+
+}
+
+
+.torneo-content .content-table table tr td {
+  padding: .5em;
+}
+
+.torneo-content .secondary-image {
+  max-width: 700px;
+}
+
+
+.dropdown-menu::before,
+.dropdown-menu::after {
+  border: none;
+  content: none;
+}
+
+@media (max-width: 400px ) {
+  .torneo-content {
+    background-size: cover;
+    background-repeat: no-repeat;
+
+  }
+
+  .bregistrate {
+    background-image: url('../img/torneo/ftorneoregister.webp') !important;
+  }
+
+  .botros {
+    background-image: url('../img/torneo/ftorneoresponsive.webp') !important;
+    background-size: 100% 100%;
+  }
+
+
+}
+

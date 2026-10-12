@@ -1,0 +1,353 @@
+.cx-form.cx-form-horizontal {
+    background: white !important;
+    color: grey !important;
+  }
+
+  .cx-widget.cx-theme-dark .cx-form-control {
+    background-color: white !important;
+    color: gray !important;
+  }
+
+  .cx-common-container .cx-titlebar {
+    background: #002460 !important;
+  }
+
+  .cx-footer {
+    background-color: white !important;
+    border-color: white !important;
+    text-align:center !important;
+  }
+
+  .cx-widget.cx-theme-dark button.cx-btn-default {
+    background-color: #cccccc !important;
+    border-color: #cccccc !important;
+    font-size: 12px;
+    width: 120px;
+    position: relative;
+  }
+
+  /* .cx-widget.cx-theme-dark .cx-btn-primary {
+    border-color: #002460 !important;
+    background: #002460 !important;
+    width: 80%;
+    margin: 25px;
+  } */
+
+  .cx-title {
+    visibility: hidden;
+  }
+
+  .cx-title:before {
+    border-image-source: url("../img/logo-bet.png") !important;
+    content: "Live Chat" !important;
+    visibility: visible;
+    font-size: 25px !important;
+    font-weight: 500 !important;
+  }
+
+  .cx-submit .cx-btn .cx-btn-primary .i18n {
+    display: none !important;
+  }
+
+  /* body > div > div.cx-dock.cx-first.cx-dock-view.cx-docked-WebChat.cx-desktop > div > div.cx-body > div > div.cx-form-wrapper > div > div.cx-button-group.cx-buttons-binary > button.cx-submit.cx-btn.cx-btn-primary.i18n::before{
+      content: "Comenzar" !important;
+  }
+   */
+  /* .cx-common-container .cx-titlebar .cx-icon {
+    display: none !important;
+  } */
+
+  .cx-common-container .cx-titlebar {
+    padding: 14px 35px;
+    /* height: 100px; */
+  }
+  .cx-webchat .cx-form th .cx-control-label,
+  .cx-widget.cx-theme-dark input.cx-form-control,
+  .cx-widget label[for="cx_webchat_form_data"]
+  {
+    color: #002460 !important;
+  }
+
+  .cx-control-label a
+  {
+    color: #3bb5e5 !important;
+  }  
+
+  .cx-widget .cx-form-control {
+    margin: 5px;
+  }
+
+  button#chat-button {
+    position: relative;
+    float: right;
+    border-radius: 12px;
+    border-color: transparent;
+    padding: 0px;
+    transform: translate(-55px, 790px);
+    width: 25% !important;
+  }
+
+  img {
+    border-radius: 12px;
+  }
+
+  /* body > div > div.cx-dock.cx-first.cx-dock-view.cx-docked-WebChat.cx-desktop{
+      visibility: hidden;
+  } */
+
+  .cx-form-inputs:before {
+    content: " " !important;
+    white-space: pre;
+    visibility: visible !important;
+    color: black !important;
+    font-size: 11px;
+    background-image: url(../img/logo-bet-chatt.png);
+    background-size: 50% !important;
+    height: 45px;
+    position: absolute;
+    top: 2em;
+    width: 88%;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+
+  .cx-webchat .cx-form table
+  {
+      margin-top: 5em !important;
+  }
+
+  .cx-transcript {
+    background: white;
+  }
+
+  .cx-message.cx-date {
+    color: gray;
+  }
+
+  .cx-input-container {
+    background: white;
+  }
+
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-filename,
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-filesize,
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-message-text,
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-name {
+    color: black !important;
+  }
+
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-them .cx-bubble {
+    background: #f2f2f2 !important;
+    padding-top: 5px !important;
+    
+  }
+
+  .cx-webchat .cx-transcript .cx-message-group>.cx-message.cx-participant:last-child div.cx-bubble
+  {
+    border-bottom-left-radius: 4px!important;
+    border-bottom-right-radius: 4px!important;
+    border-top-left-radius: 4px!important;
+    border-top-right-radius: 0!important;
+  }
+
+  .cx-webchat .cx-transcript .cx-message-group>.cx-message.cx-them.cx-participant:last-child div.cx-bubble
+  {
+    border-bottom-left-radius: 4px!important;
+    border-bottom-right-radius: 4px!important;
+    border-top-left-radius: 0!important;
+    border-top-right-radius: 4px!important;
+  }
+
+   .cx-widget.cx-theme-dark .cx-buttons-window-control .cx-button-minimize .cx-svg-icon-tone1,
+   .cx-widget.cx-theme-dark .cx-buttons-window-control .cx-button-maximize .cx-svg-icon-tone1,
+   .cx-widget.cx-theme-dark .cx-buttons-window-control .cx-button-close .cx-svg-icon-tone1,
+   .cx-titlebar div.cx-icon .cx-svg-icon-tone1
+    {
+        fill: #FFF !important;
+    }
+
+  .cx-menu
+  {
+    display: none !important;
+  }
+
+  .cx-webchat .cx-transcript .cx-message .cx-bubble-arrow
+  {
+    position: absolute !important;
+    top: -6px !important;
+    right: -7px !important;
+  }
+
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-you div.cx-bubble
+  {
+    background-color: #3bb5e5 !important;
+    padding-top: 5px !important;
+  }
+
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-you .cx-bubble .cx-message-text,
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-you .cx-bubble .cx-time
+  {
+    color: #FFF !important;
+  }
+
+  .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-you .cx-bubble-arrow svg *
+  {
+    fill: #3ab6e5 !important;
+  }
+
+  .cx-webchat
+    .cx-transcript
+    .cx-message-group
+    > .cx-message.cx-participant:first-child
+    .cx-bubble-arrow,
+  .cx-webchat
+    .cx-transcript
+    .cx-message-group
+    > .cx-message.cx-participant:first-child
+    .cx-name {
+    color: white !important;
+  }
+
+  .cx-webchat.cx-theme-dark .cx-alert > .cx-wrapper {
+    background: white !important;
+    color: gray !important;
+  }
+
+
+  .cx-message-text {
+    color: gray !important;
+  }
+
+  .cx-webchat.cx-disabled.cx-theme-dark .cx-input-container {
+    background: white;
+  }
+
+
+    .cx-message-group *,
+    .cx-webchat.cx-theme-dark .cx-transcript div.cx-message-text {
+        color: #002460 !important;
+    }
+
+    .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-them .cx-bubble-arrow svg *
+    {
+        fill: #f2f2f2 !important;
+    }
+
+    .cx-webchat.cx-theme-dark .cx-transcript .cx-message.cx-you .cx-bubble-arrow svg *
+    {
+        fill: #3bb5e5;
+    }
+
+  .cx-widget.cx-common-container.cx-webchat.cx-close.cx-minimize.cx-theme-dark.cx-desktop {
+    width: 350px !important;
+  }
+
+  .cx-widget.cx-theme-dark {
+    background-color: #FFF !important;
+  }
+
+  .cx-widget.cx-theme-dark .cx-svg-icon-tone1 {
+        fill: #002364 !important;
+    }
+
+  .cx-widget.cx-theme-dark .cx-form-control
+  {
+    font-size: 14px!important;
+    font-weight: 400!important;
+    line-height: 22px!important;
+    border: 1px solid #e0e0e0!important;
+    border-radius: 4px!important;
+    box-sizing: border-box!important;
+    color: #424243!important;
+    margin-bottom: 12px!important;
+    padding: 8px!important;
+    width: 100%!important;
+    background: #FFF !important;
+  }
+
+  .cx-webchat div.cx-input-container .cx-message-input
+  {
+    background: #f2f2f2 !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding-right: 40px !important;
+  }
+
+  .cx-webchat div.cx-input-container
+  {
+    border: 0;
+    padding: 1em 2em 1em 2em !important;
+  }
+  .cx-webchat div.cx-send
+  {
+    display: block !important;
+    background: #01ae42 !important;
+    height: 100% !important;
+    padding: 6px !important;
+    width: 40px !important;
+    padding-top: .7em !important;
+
+}
+  .cx-webchat div.cx-send svg .cx-svg-icon-tone1
+  {
+    fill: #FFF !important;
+  }
+
+  .cx-widget.cx-theme-dark button.cx-btn-primary
+  {
+    background: #01ae42 !important;
+    border-color: #01ae42 !important;
+    /* color: #01ae42 !important; */
+    font-size: 12px;
+    width: 120px;
+    position: relative;
+  }
+
+
+
+  .cx-widget input[type=checkbox].cx-form-control
+  {
+    max-width: 14px !important;
+  }
+
+  .cx-bubble,
+  .cx-webchat .cx-transcript .cx-message.cx-date
+  {
+    font-size: 14px !important;
+    font-family: 'Gotham', 'Avenir', Helvetica, Arial, sans-serif !important;
+  }
+
+  .cx-widget label
+  {
+    font-size: 14px !important;
+    font-family: 'Gotham', 'Avenir', Helvetica, Arial, sans-serif !important;
+  }
+
+  .cx-form-inputs th,
+  .cx-form-inputs td
+  {
+    width: 100%;
+    display: block;
+  }
+
+  .cx-widget label[for="cx_webchat_form_data"]
+  {
+    font-size: 12px !important;
+  }
+
+  .cx-avatar.bot svg path.cx-svg-icon-tone1
+  {
+    fill: #FFF !important;
+  }
+
+  .cx-avatar.bot::before
+  {
+    content: " ";
+    width: 30px;
+    height: 60px;
+    background-image: url(../img/logos/loading-logo.png);
+    background-size: 30px;
+    background-repeat: no-repeat;
+    position: absolute;
+    z-index: 10;
+    background-position-x: center;
+  }

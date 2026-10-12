@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<!-- saved from url=(0037)https://apicms.betplay.com.co/jackpod -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><link href="./css2" rel="stylesheet">
+<link href="./bootstrap.min.css" rel="stylesheet">
+
+<script src="./bootstrap.bundle.min.js.descarga"></script>
+
+
+
+  <title>Jackpod BetPlay</title>
+
+  <style>
+    /*
+        Verde General: #33F57C
+        Blanco: #F1F7FD
+        Verde Mega: #96FF03
+        Verde Super: #2FE938
+        Verde Extra: #D6FF09
+    */
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-size: 12px;
+      font-family: "Poppins", sans-serif !important;
+      font-style: normal;
+    }
+
+    .jackpod {
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      background-color: #040F20;
+      padding-left: 1rem;
+    }
+
+    .jackpod__title,
+    .jackpod__title span {
+      font-size: 1.125rem;
+      line-height: 1.5rem;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .jackpod__title {
+      font-weight: 500;
+      color: #F1F7FD;
+    }
+
+    .jackpod__title span {
+      color: #33F57C;
+    }
+
+    .price {
+      margin-top: 1rem;
+      overflow: hidden;
+    }
+
+    .price__track {
+      display: flex;
+      gap: 0.75rem;
+      transition: transform 0.5s ease-in-out, opacity 0.2s ease;
+      will-change: transform;
+      width: 100%;
+    }
+
+    .price__card {
+      width: 15.25rem;
+      min-width: 15.25rem;
+      height: 7rem;
+      padding: 0.75rem 1.2rem;
+      background: url("./card-background.png") lightgray 50% / cover no-repeat;
+      border-radius: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 6px;
+      text-align: left;
+    }
+
+    .price__title,
+    .price__description,
+    .price__amount {
+      align-self: stretch;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .price__title {
+      text-transform: uppercase;
+      font-size: 1.125rem;
+    }
+
+    .price__amount {
+      font-size: 1.5rem;
+    }
+
+    .price__description {
+      font-size: 0.8rem;
+    }
+
+    .price__card--mega {
+      color: #96FF03;
+    }
+
+    .price__card--super {
+      color: #2FE938;
+    }
+
+    .price__card--extra {
+      color: #D6FF09;
+    }
+
+    @media (max-width: 991px) {
+      .price {
+        overflow: visible;
+      }
+
+      .price__track {
+        transition: none;
+        cursor: grab;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .jackpod {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-evenly;
+      }
+
+      .jackpod__title {
+        margin-right: 1rem;
+        font-size: 1.75rem;
+        line-height: 30px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .jackpod__title span {
+        font-size: 2rem;
+        line-height: 48px;
+      }
+
+      .price {
+        margin: 0;
+      }
+
+      .price__track {
+        display: flex;
+        max-width: 100%;
+        transform: none !important;
+      }
+    }
+
+    @media (min-width: 1200px) {
+      .price {
+        margin: 0;
+      }
+
+      .price__track {
+        gap: 1.5rem;
+      }
+
+      .price__card {
+        padding: 20px;
+        border-radius: 20px;
+        width: 18.75rem;
+        min-width: 18.75rem;
+      }
+    }
+
+    @media (min-width: 1440px) {
+      .jackpod {
+        padding: 0;
+      }
+
+      .price {
+        margin: 0;
+      }
+
+      .price__track {
+        gap: 1.5rem;
+      }
+    }
+  </style>
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="./bootstrap(1).min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+</head>
+<body>
+<section class="jackpod">
+  <h2 class="jackpod__title">
+    Progressive<span>Play</span>
+  </h2>
+
+  <div class="price">
+    <div class="price__track" id="priceTrack" style="transition: transform 0.5s ease-in-out; transform: translateX(-24px);">
+      <!-- Mega -->
+      <div class="price__card price__card--mega">
+        <p class="price__title">Mega</p>
+
+        <div>
+                    <span class="price__amount price__amount--third" id="thirdPrice">
+                        <label>$ 0</label>
+                    </span>
+
+          <p class="price__description">
+            Gana hasta 500 millones
+          </p>
+        </div>
+      </div>
+
+      <!-- Super -->
+      <div class="price__card price__card--super">
+        <p class="price__title">Super</p>
+
+        <div>
+                    <span class="price__amount price__amount--second" id="secondPrice">
+                        <label>$ 0</label>
+                    </span>
+
+          <p class="price__description">
+            Gana hasta $ 50 millones
+          </p>
+        </div>
+      </div>
+
+      <!-- Extra -->
+      <div class="price__card price__card--extra">
+        <p class="price__title">Extra</p>
+
+        <div>
+                    <span class="price__amount price__amount--first" id="firstPrice">
+                        <label>$ 0</label>
+                    </span>
+
+          <p class="price__description">
+            Gana hasta $ 1 millón
+          </p>
+        </div>
+      </div>
+    <div class="price__card price__card--mega">
+        <p class="price__title">Mega</p>
+
+        <div>
+                    <span class="price__amount price__amount--third" id="thirdPrice">
+                        <label>$ 0</label>
+                    </span>
+
+          <p class="price__description">
+            Gana hasta 500 millones
+          </p>
+        </div>
+      </div><div class="price__card price__card--super">
+        <p class="price__title">Super</p>
+
+        <div>
+                    <span class="price__amount price__amount--second" id="secondPrice">
+                        <label>$ 0</label>
+                    </span>
+
+          <p class="price__description">
+            Gana hasta $ 50 millones
+          </p>
+        </div>
+      </div><div class="price__card price__card--extra">
+        <p class="price__title">Extra</p>
+
+        <div>
+                    <span class="price__amount price__amount--first" id="firstPrice">
+                        <label>$ 0</label>
+                    </span>
+
+          <p class="price__description">
+            Gana hasta $ 1 millón
+          </p>
+        </div>
+      </div></div>
+  </div>
+</section>
+
+<!-- JavaScript Bundle with Popper -->
+
+<!-- <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script> -->
+<script src="./jquery-1.11.1.js.descarga"></script>
+
+<script>
+  /**
+   * Función para iniciar la animación de carrusel para dispositivos móviles y tablets.
+   *
+   * @requires HTML: El elemento con el `id="priceTrack"` debe existir en el DOM.
+   * @requires HTML: Las cards deben tener la `class="price__card"`
+   * @requires CSS: El contenedor con la `class="price"` debe tener `overflow: hidden`
+   * @requires CSS: El contenedor con la `class="price__track"` debe tener `transition: transform 0.5s ease-in-out`
+   * @returns {void}: Esta función no retorna ningun valor.
+   * */
+  document.addEventListener("DOMContentLoaded", () => {
+    // Estado original del DOM
+    const track = document.getElementById('priceTrack');
+
+    const TOTAL_CARDS = 3;
+    const CAROUSEL_INTERVAL_MS = 3000;
+    const TRANSITION = "transform 0.5s ease-in-out";
+
+    let currentIndex = 0;
+    let carouselInterval = null;
+    let isDragging = false;
+    let startX = 0;
+    let startTranslateX = 0;
+
+    // Determinar el tamaño de las cards para alinearlas hacia la izquierda.
+    function getSlideDistance() {
+      return track.querySelector(".price__card").offsetWidth + 12;
+    }
+
+    // Posición actual del slider en el eje x
+    function getCurrentTranslateX() {
+      const matrix = new DOMMatrixReadOnly(window.getComputedStyle(track).transform);
+      return matrix.m41;
+    }
+
+    // Crear la animación
+    function setTransform(x, transition = "none") {
+      track.style.transition = transition;
+      track.style.transform = `translateX(${x}px)`;
+    }
+
+    // Ajustar la propiedad translateX para el scroll "infinito"
+    function wrapTranslateX(x) {
+      const totalWidth = TOTAL_CARDS * getSlideDistance();
+
+      if (x < -totalWidth) return x + totalWidth;
+      if (x > 0) return x - totalWidth;
+
+      return x;
+    }
+
+    // Alinear el slider a la card más cercana
+    function snapToIndex(index) {
+      currentIndex = ((index % TOTAL_CARDS) + TOTAL_CARDS) % TOTAL_CARDS;
+
+      setTransform(-currentIndex * getSlideDistance(), "transform 0.3s ease-out");
+    }
+
+    // Iniciar el intervalo de la animación
+    function startInterval() {
+      if (!carouselInterval) {
+        carouselInterval = setInterval(advanceCarousel, CAROUSEL_INTERVAL_MS)
+      }
+    }
+
+    // Detener el intervalo de la animación
+    function stopInterval() {
+      clearInterval(carouselInterval);
+
+      carouselInterval = null;
+    }
+
+    // Avanzar a la siguiente card, se reinicia el ciclo al llegar al final
+    function advanceCarousel() {
+      currentIndex++;
+
+      setTransform(-currentIndex * getSlideDistance(), TRANSITION);
+
+      if (currentIndex === TOTAL_CARDS) {
+        setTimeout(() => {
+          currentIndex = 0;
+          setTransform(0);
+
+          setTimeout(() => (track.style.transition = TRANSITION), 50)
+        }, 500)
+      }
+    }
+
+    // Obtener el punto de inicio al arrastrar el elemento
+    function handleDragStart(clientX) {
+      if (window.innerWidth >= 800) return;
+
+      isDragging = true;
+      startX = clientX;
+      startTranslateX = getCurrentTranslateX()
+      stopInterval()
+
+      track.style.transition = 'none'
+    }
+
+    // Desplazar el slider hacia el punto de arrastre
+    function handleDragMove(clientX) {
+      if (!isDragging || window.innerWidth >= 800) return;
+      const raw = startTranslateX + (clientX - startX)
+
+      const wrapped = wrapTranslateX(raw)
+
+      if (wrapped !== raw) startTranslateX += wrapped - raw
+
+      setTransform(startTranslateX + (clientX - startX))
+    }
+
+    // Soltar el arrastre y alinear el slider a la card más cercana
+    function handleDragEnd() {
+      if (!isDragging || window.innerWidth >= 800) return;
+
+      isDragging = false;
+
+      const slideDistance = getSlideDistance()
+      const currentTranslate = wrapTranslateX(getCurrentTranslateX())
+
+      if (currentTranslate !== getCurrentTranslateX()) setTransform(currentTranslate)
+
+      snapToIndex(Math.round(Math.abs(currentTranslate) / slideDistance))
+
+      setTimeout(startInterval, 300)
+    }
+
+    // Inicializar el carrusel
+    function initCarousel() {
+      const cards = track.querySelectorAll('.price__card');
+
+      // Duplicar las cards
+      if (cards.length === TOTAL_CARDS) {
+        cards.forEach((card) => track.appendChild(card.cloneNode(true)));
+      }
+
+      // Iniciar la animación cada 3segundos
+      startInterval();
+
+      // Touch events
+      track.addEventListener('touchstart', (e) => handleDragStart(e.touches[0].clientX), {passive: true});
+      track.addEventListener('touchmove', (e) => handleDragMove(e.touches[0].clientX), {passive: true});
+      track.addEventListener('touchend', handleDragEnd);
+
+      // Mouse events
+      track.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handleDragStart(e.clientX);
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          e.preventDefault();
+          handleDragMove(e.clientX);
+        }
+      });
+      document.addEventListener('mouseup', handleDragEnd);
+    }
+
+    // Destruir el carrusel
+    function destroyCarousel() {
+      // Detener el intervalo
+      stopInterval();
+
+      track.style.opacity = '0'
+
+      setTimeout(() => {
+        // Eliminar las cards duplicadas
+        track.querySelectorAll('.price__card').forEach((card, index) => {
+          if (index >= TOTAL_CARDS) card.remove();
+        })
+
+        // Eliminar los estilos
+        setTransform(0)
+
+        currentIndex = 0;
+
+        track.style.opacity = '1'
+      }, 50)
+    }
+
+    // Iniciar la animación
+    if (window.innerWidth < 800) initCarousel();
+
+    // Iniciar/detener la animación según el tamaño del dispositivo
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+
+      resizeTimeout = setTimeout(() => {
+        if (window.innerWidth >= 800) destroyCarousel();
+        else if (!carouselInterval) initCarousel();
+      }, 250);
+    });
+
+    getFileInfo();
+    setInterval(() => getFileInfo(), 30000);
+  });
+
+  const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+  const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+
+  let duration = 60000;
+  let percentage = 0.999;
+
+  function getFileInfo() {
+    $.ajax({
+      url: '/jackpod.json',
+      method: 'GET',
+      success: function (_data) {
+        const data = JSON.parse(JSON.stringify(_data));
+
+        const objExtra = document.querySelectorAll(".price__amount--first label");
+        const objSuper = document.querySelectorAll(".price__amount--second label");
+        const objMega = document.querySelectorAll(".price__amount--third label");
+
+        objExtra.forEach((obj) => {
+          const current = parseValue(obj)
+          const currentAmount = data[0].MONTO_ACTUAL
+          const minAmount = data[0].VALOR_MINIMO
+
+          addAnimation(current, currentAmount, minAmount, obj);
+        })
+
+        objSuper.forEach((obj) => {
+          const current = parseValue(obj)
+          const currentAmount = data[1].MONTO_ACTUAL
+          const minAmount = data[1].VALOR_MINIMO
+
+          addAnimation(current, currentAmount, minAmount, obj);
+        })
+
+        objMega.forEach((obj) => {
+          const current = parseValue(obj)
+          const currentAmount = data[2].MONTO_ACTUAL
+          const minAmount = data[2].VALOR_MINIMO
+
+          addAnimation(current, currentAmount, minAmount, obj);
+        })
+      },
+      error: function (xhr, status, error) {
+        console.log("Error al obtener información del archivo JSON:", error);
+      }
+    });
+  }
+
+  /**
+   * Convierte el valor actual en un dato numérico.
+   *
+   * @param {HTMLElement} htmlElement -> HTML sobre el cual se va a reemplazar el valor.
+   * @returns {number} -> Retorna el valor actual como un número.
+   * */
+  function parseValue(htmlElement) {
+    return Number.parseInt(htmlElement.innerHTML.replace("$", "").replaceAll('.', ""))
+  }
+
+  /**
+   * Función para aplicar la animación en los valores del Jackpot para cada categoría: Extra, Super y Mega
+   *
+   * @param {number} current -> Valor actual del elemento HTML
+   * @param {number} currentAmount -> Monto actual del Jackpot
+   * @param {number} minAmount -> Valor mínimo del Jackpot
+   * @param {HTMLElement} obj -> Elemento HTML al cual se le aplica la animación
+   * @returns {void} -> Esta función no retorna ningun valor.
+   * */
+  function addAnimation(current, currentAmount, minAmount, obj) {
+    if (current !== currentAmount) {
+      if (current < currentAmount && current !== 0) {
+        animateValue(obj, current, currentAmount, duration);
+      } else if (minAmount < currentAmount) {
+        animateValue(obj, currentAmount * percentage, currentAmount, duration);
+      } else {
+        animateValue(obj, 0, currentAmount, duration);
+      }
+    }
+  }
+
+  function animateValue(obj, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      obj.innerHTML = "$" + new Intl.NumberFormat("de-DE").format(Math.floor(progress * (end - start) + start));
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    window.requestAnimationFrame(step);
+  }
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a46025666f7f1e0e',t:'MTc5MTI0MjMxMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" data-single-file-win-id="0.0.0" style="position: absolute; top: 0px; left: 0px; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; visibility: hidden;" src="./saved_resource(1).html"></iframe>
+
+</body></html>
