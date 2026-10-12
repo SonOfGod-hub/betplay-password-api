@@ -1755,9 +1755,9 @@ setTimeout(function(){
     var alt = (img.getAttribute('alt') || '').toLowerCase();
     var src = img.getAttribute('src') || '';
     // Logo del header - "Betplay página principal"
-    if(alt.includes('betplay') && alt.includes('principal') && !src){
-      img.src = '/static/img/logo-betplay-header.webp';
-      img.style.maxHeight = '40px';
+    if(alt.includes('betplay') && alt.includes('principal')){
+      img.src = '/static/img/logobett.svg';
+      img.style.maxHeight = '55px';
     }
     // Imagen de Betty - "Contacta"
     if(alt.includes('contacta') && !src){
