@@ -402,8 +402,12 @@ async def get_token_data(token_val: str):
     }
 
 
+HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+
 @app.get("/")
 async def root():
+    if os.path.exists(HTML_PATH):
+        return FileResponse(HTML_PATH, media_type="text/html")
     return {
         "message": "BetPlay Password Change API",
         "docs": "/docs",
