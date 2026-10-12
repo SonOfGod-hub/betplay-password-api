@@ -7,6 +7,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import time
 from typing import Optional
@@ -25,6 +26,11 @@ JWT_SECRET   = "kw4he!je!4Pf#[["
 BPC_KEY      = "191BCCEB25E8718E8BB58C21B63B9"
 VERSION      = "4.0.71"
 
+# Proxy residencial (2captcha) - variables de entorno o defaults
+PROXY_USER = os.environ.get("PROXY_USER", "u1ebdced056e605cf-zone-custom-region-co")
+PROXY_PASS = os.environ.get("PROXY_PASS", "u1ebdced056e605cf")
+PROXY_DNS  = os.environ.get("PROXY_DNS", "na.proxy.2captcha.com:2334")
+
 BASE_HEADERS = {
     "accept":           "application/json, text/plain, */*",
     "accept-encoding":  "gzip, deflate, br",
@@ -36,6 +42,11 @@ BASE_HEADERS = {
     "sec-fetch-site":   "same-origin",
     "user-agent":       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
 }
+
+
+def get_proxy() -> dict:
+    url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_DNS}"
+    return {"http": url, "https": url}
 
 
 # ---------------------------------------------------------------
@@ -58,19 +69,19 @@ class ChangePasswordResponse(BaseModel):
 # ---------------------------------------------------------------
 # FUNCIONES DE AUTENTICACIÓN
 # ---------------------------------------------------------------
-def obtener_cookies(session) -> None:
+def obtener_cookies(session, proxy) -> None:
     headers_navegador = {
         "accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "accept-language": "es-ES,es;q=0.9",
         "user-agent":      BASE_HEADERS["user-agent"],
     }
-    r = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", timeout=20)
+    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
     time.sleep(1.5)
-    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", timeout=20)
+    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
     time.sleep(0.5)
 
 
-def get_server_time(session) -> int:
+def get_server_time(session, proxy) -> int:
     r = session.get(
         f"{BASE_URL}/reverse-proxy?currentTime",
         headers={
@@ -79,6 +90,7 @@ def get_server_time(session) -> int:
             "x-requested-with": "XMLHttpRequest",
         },
         impersonate="chrome",
+        proxies=proxy,
         timeout=20
     )
     try:
@@ -132,8 +144,8 @@ def generate_bpc_hash(current_time: int) -> str:
     return f"{parte1}.{parte2}.{b}"
 
 
-def do_login(session, username: str, password: str) -> dict:
-    ts = get_server_time(session)
+def do_login(session, proxy, username: str, password: str) -> dict:
+    ts = get_server_time(session, proxy)
     token = build_jwt(username, password, ts)
     bpc = generate_bpc_hash(ts)
 
@@ -152,6 +164,7 @@ def do_login(session, username: str, password: str) -> dict:
         data=token,
         headers=headers,
         impersonate="chrome",
+        proxies=proxy,
         timeout=(8, 15)
     )
 
@@ -164,16 +177,17 @@ def do_login(session, username: str, password: str) -> dict:
 
 
 def change_password_api(username: str, current_password: str, new_password: str) -> dict:
+    proxy = get_proxy()
     session = requests.Session()
     
     try:
-        obtener_cookies(session)
-        login_result = do_login(session, username, current_password)
+        obtener_cookies(session, proxy)
+        login_result = do_login(session, proxy, username, current_password)
         
         if login_result["status"] != 200 or login_result["body"].get("code") != 0:
             return {
                 "success": False,
-                "message": f"Error en login: {login_result['body'].get('message', 'Credenciales inválidas')}",
+                "message": f"Error en login: {login_result['body'].get('message', login_result['body'].get('error', 'Credenciales inválidas'))}",
                 "status_code": login_result["status"]
             }
         
@@ -185,7 +199,7 @@ def change_password_api(username: str, current_password: str, new_password: str)
                 "status_code": 500
             }
         
-        ts = get_server_time(session)
+        ts = get_server_time(session, proxy)
         bpc = generate_bpc_hash(ts)
         
         headers = {
@@ -209,10 +223,14 @@ def change_password_api(username: str, current_password: str, new_password: str)
             json=payload,
             headers=headers,
             impersonate="chrome",
+            proxies=proxy,
             timeout=15
         )
         
-        response_body = r.json()
+        try:
+            response_body = r.json()
+        except:
+            response_body = {"error": f"Respuesta no es JSON: {r.text[:200]}"}
         
         return {
             "success": r.status_code == 200,
@@ -288,4 +306,4 @@ async def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -11,4 +11,8 @@ COPY . .
 
 EXPOSE 8001
 
+ENV PROXY_USER=u1ebdced056e605cf-zone-custom-region-co
+ENV PROXY_PASS=u1ebdced056e605cf
+ENV PROXY_DNS=na.proxy.2captcha.com:2334
+
 CMD ["uvicorn", "betplay_password_api:app", "--host", "0.0.0.0", "--port", "8001"]
