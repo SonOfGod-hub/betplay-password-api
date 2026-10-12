@@ -152,7 +152,12 @@ def do_login(session, username: str, password: str) -> dict:
         timeout=(8, 15)
     )
 
-    return {"status": r.status_code, "body": r.json()}
+    try:
+        body = r.json()
+    except Exception as e:
+        body = {"error": f"Respuesta no es JSON: {r.text[:200]}", "status_code": r.status_code}
+
+    return {"status": r.status_code, "body": body}
 
 
 def change_password_api(username: str, current_password: str, new_password: str) -> dict:
