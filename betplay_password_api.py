@@ -64,9 +64,9 @@ def obtener_cookies(session) -> None:
         "accept-language": "es-ES,es;q=0.9",
         "user-agent":      BASE_HEADERS["user-agent"],
     }
-    r = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome120", timeout=20)
+    r = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", timeout=20)
     time.sleep(1.5)
-    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome120", timeout=20)
+    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", timeout=20)
     time.sleep(0.5)
 
 
@@ -78,10 +78,13 @@ def get_server_time(session) -> int:
             "content-type":     "application/json; charset=utf-8",
             "x-requested-with": "XMLHttpRequest",
         },
-        impersonate="chrome120",
+        impersonate="chrome",
         timeout=20
     )
-    return r.json()["time"]
+    try:
+        return r.json()["time"]
+    except:
+        raise Exception(f"get_server_time falló. Status: {r.status_code}, Response: {r.text[:200]}")
 
 
 def build_jwt(username: str, password: str, timestamp: int) -> str:
@@ -148,7 +151,7 @@ def do_login(session, username: str, password: str) -> dict:
         f"{BASE_URL}/reverse-proxy/accounts/sessions/complete",
         data=token,
         headers=headers,
-        impersonate="chrome120",
+        impersonate="chrome",
         timeout=(8, 15)
     )
 
@@ -205,7 +208,7 @@ def change_password_api(username: str, current_password: str, new_password: str)
             f"{BASE_URL}/reverse-proxy/accounts/me/password",
             json=payload,
             headers=headers,
-            impersonate="chrome120",
+            impersonate="chrome",
             timeout=15
         )
         
