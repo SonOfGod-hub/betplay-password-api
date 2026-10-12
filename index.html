@@ -1753,14 +1753,16 @@ setTimeout(function(){
   var imgs = document.querySelectorAll('img');
   imgs.forEach(function(img){
     var alt = (img.getAttribute('alt') || '').toLowerCase();
-    if(alt.includes('betplay') && alt.includes('principal') && !img.src){
-      img.src = '/static/img/logo-header.png';
+    var src = img.getAttribute('src') || '';
+    // Logo del header - "Betplay página principal"
+    if(alt.includes('betplay') && alt.includes('principal') && !src){
+      img.src = '/static/img/logo-betplay-header.png';
+      img.style.maxHeight = '40px';
     }
-    if(alt.includes('afiliados') && !img.src){
-      img.src = '/static/img/logo-betplay.svg';
-    }
-    if(alt.includes('responsable') && !img.src){
-      img.src = '/static/img/Responsable (1) 2.svg';
+    // Imagen de Betty - "Contacta"
+    if(alt.includes('contacta') && !src){
+      img.src = '/static/img/betty-contacta.png';
+      img.style.maxHeight = '80px';
     }
   });
 }, 500);
