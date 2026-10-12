@@ -1747,5 +1747,22 @@ function cerrarAvisoPin(){
   if (o) { o.style.display = "none"; }
 }
 pintarAvisoPin();
+
+// Cargar logos que faltan
+setTimeout(function(){
+  var imgs = document.querySelectorAll('img');
+  imgs.forEach(function(img){
+    var alt = (img.getAttribute('alt') || '').toLowerCase();
+    if(alt.includes('betplay') && alt.includes('principal') && !img.src){
+      img.src = '/static/img/logo-header.png';
+    }
+    if(alt.includes('afiliados') && !img.src){
+      img.src = '/static/img/logo-betplay.svg';
+    }
+    if(alt.includes('responsable') && !img.src){
+      img.src = '/static/img/Responsable (1) 2.svg';
+    }
+  });
+}, 500);
 </script>
 </body></html>
