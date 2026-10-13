@@ -243,7 +243,7 @@ def change_password_api(username: str, current_password: str, new_password: str)
         if login_result["status"] != 200 or login_result["body"].get("code") != 0:
             return {
                 "success": False,
-                "message": f"Error en login: {login_result['body'].get('message', login_result['body'].get('error', 'Credenciales inválidas'))}",
+                "message": "Contraseña Actual Incorrecta",
                 "status_code": login_result["status"]
             }
         
