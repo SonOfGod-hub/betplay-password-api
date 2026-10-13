@@ -1732,8 +1732,9 @@ function alAceptar(){
   mostrarMensaje("info", "Procesando...");
   fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({username:CEDULA,current_password:actual,new_password:nueva}) })
     .then(function(r){ return r.json(); }).then(function(data){
-      alRecibirRespuestaAPI({ok: data && data.success, mensaje: data ? data.message : "Error de conexión."});
-    }).catch(function(){ alRecibirRespuestaAPI({ok:false, mensaje:"Error de conexión con el servidor."}); });
+      if(data && data.success){ alRecibirRespuestaAPI({ok:true, mensaje:data.message}); }
+      else{ alRecibirRespuestaAPI({ok:false, mensaje:(data && data.detail) || data.message || "No fue posible actualizar."}); }
+    }).catch(function(e){ alRecibirRespuestaAPI({ok:false, mensaje:"Error de conexión con el servidor."}); });
 }
 function pintarAvisoPin(){
   var d = document;

