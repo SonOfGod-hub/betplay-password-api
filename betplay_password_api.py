@@ -75,7 +75,7 @@ def save_tokens(tokens: dict):
     with open(TOKENS_FILE, "w") as f:
         json.dump(tokens, f, indent=2)
 
-def generate_token(length=8):
+def generate_token(length=20):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choices(chars, k=length))
 
