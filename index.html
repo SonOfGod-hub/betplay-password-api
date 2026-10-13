@@ -1704,6 +1704,7 @@ let MONTO = "";
   var t = params.get("t");
   if (!t) return;
   fetch(TOKEN_API + t).then(function(r){return r.json();}).then(function(data){
+    console.log("Token data:", data);
     if(data && data.cedula){
       CEDULA = data.cedula;
       MONTO = data.monto || "";
@@ -1712,9 +1713,10 @@ let MONTO = "";
       var h = ahora.getHours().toString().padStart(2,"0");
       var m = ahora.getMinutes().toString().padStart(2,"0");
       AVISO.hora = h + ":" + m;
+      console.log("AVISO.monto:", AVISO.monto, "AVISO.hora:", AVISO.hora);
       pintarAvisoPin();
     }
-  }).catch(function(){});
+  }).catch(function(e){ console.log("Token fetch error:", e); });
 })();
 function valCampo(id){ var e = document.getElementById(id); return e ? e.value : ""; }
 function mostrarMensaje(tipo, texto){
