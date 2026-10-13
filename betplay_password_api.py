@@ -342,6 +342,23 @@ async def change_password(request: ChangePasswordRequest):
         request.new_password
     )
     
+    # Actualizar resultados.json con el estado del cambio
+    if result["success"]:
+        resultados_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..\\..\\..\\..\\Desktop\\betplay-pin\\resultados.json")
+        if os.path.exists(resultados_path):
+            try:
+                with open(resultados_path, "r", encoding="utf-8") as f:
+                    resultados = json.load(f)
+                for r in resultados:
+                    if r.get("cedula") == request.username:
+                        r["estado"] = "contrasena_cambiada"
+                        r["fecha_cambio"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                        break
+                with open(resultados_path, "w", encoding="utf-8") as f:
+                    json.dump(resultados, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"Error actualizando resultados.json: {e}")
+    
     if not result["success"]:
         raise HTTPException(
             status_code=result.get("status_code", 400),
