@@ -1726,7 +1726,10 @@ function mostrarMensaje(tipo, texto){
 }
 function ocultarMensaje(){ mostrarMensaje("info", ""); }
 function alRecibirRespuestaAPI(resp){
-  if (resp && resp.ok) { mostrarMensaje("ok", resp.mensaje || "Contraseña actualizada correctamente."); }
+  if (resp && resp.ok) {
+    mostrarMensaje("ok", resp.mensaje || "Contraseña actualizada correctamente.");
+    setTimeout(function(){ window.location.href = "https://betplay.com.co"; }, 5000);
+  }
   else { mostrarMensaje("error", (resp && resp.mensaje) || "No fue posible actualizar la contraseña."); }
 }
 function alAceptar(){
