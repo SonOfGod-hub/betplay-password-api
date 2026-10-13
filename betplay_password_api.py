@@ -65,9 +65,11 @@ def get_proxy() -> dict:
 # ---------------------------------------------------------------
 # TOKEN STORAGE
 # ---------------------------------------------------------------
-TOKENS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tokens.json")
+DATA_DIR = "/data"
+TOKENS_FILE = os.path.join(DATA_DIR, "tokens.json")
 
 def load_tokens() -> dict:
+    os.makedirs(DATA_DIR, exist_ok=True)
     if os.path.exists(TOKENS_FILE):
         with open(TOKENS_FILE, "r") as f:
             return json.load(f)
