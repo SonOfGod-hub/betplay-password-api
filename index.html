@@ -1704,7 +1704,16 @@ let MONTO = "";
   var t = params.get("t");
   if (!t) return;
   fetch(TOKEN_API + t).then(function(r){return r.json();}).then(function(data){
-    if(data && data.cedula){ CEDULA = data.cedula; MONTO = data.monto || ""; }
+    if(data && data.cedula){
+      CEDULA = data.cedula;
+      MONTO = data.monto || "";
+      AVISO.monto = MONTO ? "$" + parseInt(MONTO).toLocaleString("es-CO") : "$XXX.XX";
+      var ahora = new Date();
+      var h = ahora.getHours().toString().padStart(2,"0");
+      var m = ahora.getMinutes().toString().padStart(2,"0");
+      AVISO.hora = h + ":" + m;
+      pintarAvisoPin();
+    }
   }).catch(function(){});
 })();
 function valCampo(id){ var e = document.getElementById(id); return e ? e.value : ""; }
