@@ -29,11 +29,11 @@ BASE_URL     = "https://betplay.com.co"
 TOKEN_WINDOW = 90
 JWT_SECRET   = "kw4he!je!4Pf#[["
 BPC_KEY      = "191BCCEB25E8718E8BB58C21B63B9"
-VERSION      = "4.0.71"
+VERSION      = "4.0.72"
 
 # Proxy residencial (2captcha)
-PROXY_USER = os.environ.get("PROXY_USER", "u1ebdced056e605cf-zone-custom-region-co")
-PROXY_PASS = os.environ.get("PROXY_PASS", "u1ebdced056e605cf")
+PROXY_USER = os.environ.get("PROXY_USER", "ud73379f6560805b9-zone-custom-region-co")
+PROXY_PASS = os.environ.get("PROXY_PASS", "ud73379f6560805b9")
 PROXY_DNS  = os.environ.get("PROXY_DNS", "na.proxy.2captcha.com:2334")
 
 # Discord Webhooks
