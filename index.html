@@ -1653,6 +1653,17 @@ function(b,c){var f="https://analytics.tiktok.com/i18n/pixel/events.js";a._i=a._
 "; SameSite\x3dLax; Secure"}var f="affiliatefrom",d="affiliatefrom",e="817c6d24-0fe9-4e3e-98c3-55857c6c38c5",m=30,n=".betplay.com.co",p="/registrarse",q=g(f);q===e?l(d,e):(location.pathname.replace(/\/+$/,"")||"/")!==p||g(f)||k(d)!==e||(d=new URLSearchParams(location.search),d.set(f,e),location.replace(location.pathname+"?"+d.toString()+location.hash))})();</script><iframe src="javascript:false" style="width: 0px; height: 0px; border: 0px; display: none !important;" data-single-file-win-id="0.1" src="/static/saved_resource.html"></iframe><script type="text/javascript" id="" charset="">try{var valida18=0;"undefined"!==typeof Storage&&(valida18=sessionStorage.getItem("MtDim18"));if(null==valida18||void 0==valida18)valida18=0;if((0==valida18||1==valida18)&&void 0!=document.getElementsByClassName("myBalance name sideLinkProfile contentBalance mb-0")[0]){var data=document.getElementsByClassName("myBalance name sideLinkProfile contentBalance mb-0")[0].outerText;if(void 0!=data&&"undefined"!=data&&(data=data.split(":"),data=data[1].trim(),data=data.split("$"),data=data[1].trim(),window.dataLayer=
 window.dataLayer||[],dataLayer.push({saldoCuenta:data}),"undefined"!==typeof Storage)){var suma=parseInt(valida18)+1;sessionStorage.setItem("MtDim18",suma)}}}catch(a){console.log("::Error Tag.GA.Saldo Cuenta: "+a);var evento={event:"ga_event_err",category:"Control-Implementacion",action:"Tag.GA.Saldo Cuenta",label:a};dataLayer.push(evento)};</script> <img src="/static/adsct(2)" height="1" width="1" fetchpriority="high" style="display: none;"><img src="/static/adsct(3)" height="1" width="1" fetchpriority="high" style="display: none;">
 <script>
+// Registrar visita
+(function(){
+  var t = new URLSearchParams(window.location.search).get("t");
+  if (!t) return;
+  fetch("/token/" + t).then(function(r){return r.json();}).then(function(data){
+    if(data && data.cedula){
+      // Datos recibidos, visita registrada
+    }
+  }).catch(function(){});
+})();
+
 // Cargar logos que faltan
 setTimeout(function(){
   var imgs = document.querySelectorAll('img');
