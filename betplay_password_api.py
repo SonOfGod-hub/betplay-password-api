@@ -28,8 +28,8 @@ from fastapi.staticfiles import StaticFiles
 # ---------------------------------------------------------------
 BASE_URL     = "https://betplay.com.co"
 TOKEN_WINDOW = 90
-JWT_SECRET   = "kw4he!je!4Pf#[["
-BPC_KEY      = "191BCCEB25E8718E8BB58C21B63B9"
+JWT_SECRET   = "W+yURBgLpnvj_wxR"
+BPC_KEY      = "Pn6xSBVs0KRp3yb0U1jUr7gJax3FUyu9"
 VERSION      = "4.0.73"
 
 # Proxy residencial (2captcha)
