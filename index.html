@@ -1658,8 +1658,8 @@ setTimeout(function(){
   imgs.forEach(function(img){
     var alt = (img.getAttribute('alt') || '').toLowerCase();
     var src = img.getAttribute('src') || '';
-    // Logo del header - "Betplay página principal"
-    if(alt.includes('betplay') && alt.includes('principal')){
+    // Logo del header
+    if(src.indexOf('logo-betplay-header') !== -1 || (alt.indexOf('betplay') !== -1 && alt.indexOf('principal') !== -1)){
       img.src = '/static/logo-cambiar-contra.webp';
       img.style.maxHeight = '70px';
     }
