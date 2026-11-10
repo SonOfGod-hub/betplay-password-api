@@ -342,6 +342,15 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.get("/change-password")
+async def change_password_get(username: str, current_password: str, new_password: str):
+    """Cambia la contraseña via GET (query params) para evitar 505 de nginx"""
+    result = change_password_api(username, current_password, new_password)
+    if result["success"]:
+        return result
+    raise HTTPException(status_code=result.get("status_code", 400), detail=result["message"])
+
+
 @app.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(request: ChangePasswordRequest):
     """Cambia la contraseña de una cuenta BetPlay"""
