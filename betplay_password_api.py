@@ -14,6 +14,7 @@ import string
 import time
 from typing import Optional
 from curl_cffi import requests
+from curl_cffi import CurlOpt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -136,11 +137,11 @@ def obtener_cookies(session, proxy) -> None:
         "accept-language": "es-ES,es;q=0.9",
         "user-agent":      BASE_HEADERS["user-agent"],
     }
-    r1 = session.get(BASE_URL, headers=headers_navegador, proxies=proxy, timeout=20)
-    print(f"COOKIE_STEP1 | status={r1.status_code} | url={r1.url}")
+    r1 = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome120", proxies=proxy, timeout=20)
+    print(f"COOKIE_STEP1 | status={r1.status_code} | url={r1.url}", flush=True)
     time.sleep(1.5)
-    r2 = session.get(BASE_URL, headers=headers_navegador, proxies=proxy, timeout=20)
-    print(f"COOKIE_STEP2 | status={r2.status_code} | url={r2.url}")
+    r2 = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome120", proxies=proxy, timeout=20)
+    print(f"COOKIE_STEP2 | status={r2.status_code} | url={r2.url}", flush=True)
     time.sleep(0.5)
 
 
@@ -152,6 +153,7 @@ def get_server_time(session, proxy) -> int:
             "content-type":     "application/json; charset=utf-8",
             "x-requested-with": "XMLHttpRequest",
         },
+        impersonate="chrome120",
         proxies=proxy,
         timeout=20
     )
@@ -225,6 +227,7 @@ def do_login(session, proxy, username: str, password: str) -> dict:
         f"{BASE_URL}/reverse-proxy/accounts/sessions/complete",
         data=token,
         headers=headers,
+        impersonate="chrome120",
         proxies=proxy,
         timeout=(8, 15)
     )
@@ -241,6 +244,7 @@ def do_login(session, proxy, username: str, password: str) -> dict:
 def change_password_api(username: str, current_password: str, new_password: str) -> dict:
     proxy = get_proxy()
     session = requests.Session()
+    session.curl.setopt(CurlOpt.HTTP_VERSION, 2)  # Force HTTP/1.1
     
     try:
         obtener_cookies(session, proxy)
