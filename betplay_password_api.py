@@ -136,9 +136,11 @@ def obtener_cookies(session, proxy) -> None:
         "accept-language": "es-ES,es;q=0.9",
         "user-agent":      BASE_HEADERS["user-agent"],
     }
-    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
+    r1 = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
+    print(f"COOKIE_STEP1 | status={r1.status_code} | url={r1.url}")
     time.sleep(1.5)
-    session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
+    r2 = session.get(BASE_URL, headers=headers_navegador, impersonate="chrome", proxies=proxy, timeout=20)
+    print(f"COOKIE_STEP2 | status={r2.status_code} | url={r2.url}")
     time.sleep(0.5)
 
 
@@ -228,6 +230,7 @@ def do_login(session, proxy, username: str, password: str) -> dict:
         proxies=proxy,
         timeout=(8, 15)
     )
+    print(f"LOGIN_REQUEST | status={r.status_code} | response={r.text[:300]}")
 
     try:
         body = r.json()
@@ -246,9 +249,10 @@ def change_password_api(username: str, current_password: str, new_password: str)
         login_result = do_login(session, proxy, username, current_password)
         
         if login_result["status"] != 200 or login_result["body"].get("code") != 0:
+            print(f"LOGIN FAILED | status={login_result['status']} | body={json.dumps(login_result['body'], ensure_ascii=False)[:500]}")
             return {
                 "success": False,
-                "message": "Contraseña Actual Incorrecta",
+                "message": f"Contraseña Actual Incorrecta (HTTP {login_result['status']})",
                 "status_code": login_result["status"]
             }
         
