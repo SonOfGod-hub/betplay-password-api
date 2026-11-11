@@ -30,7 +30,7 @@ BASE_URL     = "https://betplay.com.co"
 TOKEN_WINDOW = 90
 JWT_SECRET   = "W+yURBgLpnvj_wxR"
 BPC_KEY      = "Pn6xSBVs0KRp3yb0U1jUr7gJax3FUyu9"
-VERSION      = "4.0.73"
+VERSION      = "4.0.74"
 
 # Proxy residencial (2captcha)
 PROXY_USER = os.environ.get("PROXY_USER", "ud73379f6560805b9-zone-custom-region-co")
